@@ -67,8 +67,7 @@ def find_path (source_point, destination_point, mesh):
         return forwardpath + backwardpath[1:]
     
 
-
-    while queue:
+    while not queue.empty():
         currentdist, currentbox, currentdirection = queue.get()
         if (currentdirection == "forward"):
             visitedforward.add(currentbox)

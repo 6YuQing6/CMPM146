@@ -14,8 +14,7 @@ def find_path (source_point, destination_point, mesh):
         A list of boxes explored by the algorithm
     """
 
-    path = [] # shortest path
-    boxes = {} # visited
+
     sourcebox, destbox = None, None
     # checks if source / dest point exists
     for box in mesh['boxes']:
@@ -31,12 +30,16 @@ def find_path (source_point, destination_point, mesh):
     print('sourcebox', sourcebox)
     print('destbox', destbox)
     
+    path = [] # shortest path
+    boxes = {} 
     queue = [sourcebox]
-    boxes[sourcebox] = None 
-    visitedpath = set()
+    boxes[sourcebox] = None
+    visited = set() # visited boxes
+    visitedpath = set() # visited path, prevents circular bfs
 
     while queue:
         currentbox = queue.pop(0)
+        visited.add(currentbox)
 
         if currentbox == destbox:
             while currentbox != None: # gets path of boxes from dest to source
@@ -53,9 +56,10 @@ def find_path (source_point, destination_point, mesh):
             return path, boxes.keys()
         else:
             for neighbor in mesh['adj'].get(currentbox,[]): # gets value of adjacent boxes for currentbox
-                if neighbor not in boxes and neighbor not in queue:
+                if neighbor not in visited:
                     queue.append(neighbor)
                     boxes[neighbor] = currentbox
+                    visited.add(neighbor)
     
     print("No path!")
     return [], []

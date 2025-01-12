@@ -32,10 +32,8 @@ def find_path (source_point, destination_point, mesh):
         print("No path!")
         return [],[]
     
-    camefrom = {} 
-    camefrom[sourcebox] = None
-    point = {}
-    point[sourcebox] = source_point
+    camefrom = {sourcebox: None} 
+    point = {sourcebox: source_point}
 
     queue = PriorityQueue()
     queue.put((0,sourcebox))
@@ -72,7 +70,7 @@ def find_path (source_point, destination_point, mesh):
                     continue
                 # finds neighboring closest point 
                 neighborpoint = closest_point(point[currentbox], currentbox, neighbor)
-                newcost = currentcost + distance(neighborpoint, point[currentbox])
+                newcost = currentcost + distance(neighborpoint, destination_point)
                 # update dist and queue if shorter path found
                 if (neighbor not in cost or newcost < cost[neighbor]):
                     cost[neighbor] = newcost

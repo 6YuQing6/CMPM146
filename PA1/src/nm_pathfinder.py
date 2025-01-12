@@ -76,11 +76,6 @@ def find_path (source_point, destination_point, mesh):
 
         if currentbox in visitedbackward and currentbox in visitedforward:
             path = construct_path(currentbox)
-            # print("source: ", source_point, "dest: ", destination_point)
-            # print('path', path)
-            # print('forwardprev', forward_prev)
-            # print('backwardprev', backward_prev)
-            # print("\n")
             return path, list(visitedforward | visitedbackward)
         else:
             for neighbor in mesh['adj'].get(currentbox,[]): # gets value of adjacent boxes for currentbox

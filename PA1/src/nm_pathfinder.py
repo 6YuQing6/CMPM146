@@ -31,52 +31,84 @@ def find_path (source_point, destination_point, mesh):
     if not (sourcebox and destbox):
         print("No path!")
         return [],[]
+    if sourcebox == destbox:
+        return [source_point, destination_point], [sourcebox]
     
-    camefrom = {sourcebox: None} 
-    point = {sourcebox: source_point}
+    forward_prev = {sourcebox: None} 
+    backward_prev = {destbox: None} 
+    forward_points = {sourcebox: source_point}
+    backward_points = {destbox: destination_point}
 
+    forward_dist = {sourcebox: 0}
+    backward_dist = {destbox: 0}
+
+    visitedforward = set() # visited boxes
+    visitedbackward = set() 
+    
     queue = PriorityQueue()
-    queue.put((0,sourcebox))
-    cost = {}
+    queue.put((0,sourcebox, "forward"))
+    queue.put((0,destbox, "backward"))
 
-    visitedboxes = set() # visited boxes
+    def construct_path(meetingbox):
+        forwardpath = [] # shortest path
+        currentbox = meetingbox
+        while currentbox != None: # gets path of boxes from dest to source
+            forwardpath.append(forward_points[currentbox])
+            currentbox = forward_prev[currentbox]
+        forwardpath.reverse() # reverses so its source to box instead
+
+        backwardpath = []
+        currentbox = meetingbox
+        while currentbox != None: # gets path of boxes from dest to source
+            backwardpath.append(backward_points[currentbox])
+            currentbox = backward_prev[currentbox]
+        backwardpath.append(destination_point)
+
+        return forwardpath + backwardpath[1:]
+    
 
 
     while queue:
-        currentcost, currentbox = queue.get()
-        visitedboxes.add(currentbox)
+        currentdist, currentbox, currentdirection = queue.get()
+        if (currentdirection == "forward"):
+            visitedforward.add(currentbox)
+        else:
+            visitedbackward.add(currentbox)
 
-        if currentbox == destbox:
-            visitedpath = set() # visited path, prevents circular bfs
-            path = [] # shortest path
-            path.append(destination_point)
-            while currentbox != None: # gets path of boxes from dest to source
-                if (currentbox in visitedpath):
-                    print("No Path!")
-                    return [],[]
-                else:
-                    path.append(point[currentbox])
-                    visitedpath.add(currentbox)
-                    currentbox = camefrom[currentbox]
-            path.reverse() # reverses so its source to box instead
-            print('boxes', camefrom)
-            print('path', path)
-            print('detailpoints', point)
-            print("\n")
-            return path, list(visitedboxes)
+        if currentbox in visitedbackward and currentbox in visitedforward:
+            path = construct_path(currentbox)
+            # print("source: ", source_point, "dest: ", destination_point)
+            # print('path', path)
+            # print('forwardprev', forward_prev)
+            # print('backwardprev', backward_prev)
+            # print("\n")
+            return path, list(visitedforward | visitedbackward)
         else:
             for neighbor in mesh['adj'].get(currentbox,[]): # gets value of adjacent boxes for currentbox
-                if neighbor in visitedboxes:
-                    continue
-                # finds neighboring closest point 
-                neighborpoint = closest_point(point[currentbox], currentbox, neighbor)
-                newcost = currentcost + distance(neighborpoint, destination_point)
-                # update dist and queue if shorter path found
-                if (neighbor not in cost or newcost < cost[neighbor]):
-                    cost[neighbor] = newcost
-                    camefrom[neighbor] = currentbox
-                    point[neighbor] = neighborpoint
-                    queue.put((newcost, neighbor))
+                if (currentdirection == "forward"):
+                    if neighbor in visitedforward:
+                        continue
+                    # finds neighboring closest point 
+                    neighborpoint = closest_point(forward_points[currentbox], currentbox, neighbor)
+                    newdist = currentdist + distance(neighborpoint, destination_point)
+                    # update dist and queue if shorter path found
+                    if (neighbor not in forward_dist or newdist < forward_dist[neighbor]):
+                        forward_dist[neighbor] = newdist
+                        forward_prev[neighbor] = currentbox
+                        forward_points[neighbor] = neighborpoint
+                        queue.put((newdist, neighbor, "forward"))
+                elif (currentdirection == "backward"):
+                    if neighbor in visitedbackward:
+                        continue
+                    # finds neighboring closest point 
+                    neighborpoint = closest_point(backward_points[currentbox], currentbox, neighbor)
+                    newdist = currentdist + distance(neighborpoint, source_point)
+                    # update dist and queue if shorter path found
+                    if (neighbor not in backward_dist or newdist < backward_dist[neighbor]):
+                        backward_dist[neighbor] = newdist
+                        backward_prev[neighbor] = currentbox
+                        backward_points[neighbor] = neighborpoint
+                        queue.put((newdist, neighbor, "backward"))
     
     print("No path!")
     return [], []

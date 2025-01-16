@@ -1,126 +1,112 @@
 from queue import PriorityQueue
 import math
 
-def find_path (source_point, destination_point, mesh):
+def find_box(point, mesh):
+    """Find the box that contains the given point."""
+    x, y = point
+    for box in mesh['boxes']:
+        x1, x2, y1, y2 = box
+        if x1 <= x <= x2 and y1 <= y <= y2:
+            return box
+    return None
 
+def euclidean_distance(point1, point2):
+    """Calculate the Euclidean distance between two points."""
+    return math.sqrt((point1[0] - point2[0])**2 + (point1[1] - point2[1])**2)
+
+def closest_point(point, neighbor_box):
+    """Find the closest point in the neighbor box to the current point."""
+    x1, x2, y1, y2 = neighbor_box
+    return (
+        min(max(point[0], x1), x2),
+        min(max(point[1], y1), y2)
+    )
+
+def reconstruct_path(forward_prev, backward_prev, meeting_box, forward_points, backward_points, destination_point):
+    """Reconstruct the path by combining forward and backward paths."""
+    path = []
+
+    # Forward path: from source to meeting box
+    current_box = meeting_box
+    while current_box:
+        path.append(forward_points[current_box])
+        current_box = forward_prev[current_box]
+    path.reverse()
+
+    # Backward path: from meeting box to destination
+    current_box = meeting_box
+    while current_box:
+        path.append(backward_points[current_box])
+        current_box = backward_prev[current_box]
+    path.append(destination_point)
+
+    return path
+
+def find_path(source_point, destination_point, mesh):
     """
-    Searches for a path from source_point to destination_point through the mesh
-
-    Args:
-        source_point: starting point of the pathfinder
-        destination_point: the ultimate goal the pathfinder must reach
-        mesh: pathway constraints the path adheres to
-
-    Returns:
-
-        A path (list of points) from source_point to destination_point if exists
-        A list of boxes explored by the algorithm
+    Searches for a path from source_point to destination_point through the mesh.
     """
-    # checks if point is within box's bounds
-    def find_box(point):
-        x, y = point # point coordinates
-        for box in mesh['boxes']:
-            x1, x2, y1, y2 = box # box coordinates
-            if (x1 <= x <= x2 and y1 <= y <= y2):
-                return box
-        return None
+    source_box = find_box(source_point, mesh)
+    destination_box = find_box(destination_point, mesh)
 
-    sourcebox = find_box(source_point)
-    destbox = find_box(destination_point)
+    if not source_box or not destination_box:
+        print("No path! Points are outside the navigable area.")
+        return [], []
 
-    if not (sourcebox and destbox):
-        print("No path!")
-        return [],[]
-    if sourcebox == destbox:
-        return [source_point, destination_point], [sourcebox]
-    
-    forward_prev = {sourcebox: None} 
-    backward_prev = {destbox: None} 
-    forward_points = {sourcebox: source_point}
-    backward_points = {destbox: destination_point}
+    if source_box == destination_box:
+        return [source_point, destination_point], [source_box]
 
-    forward_dist = {sourcebox: 0}
-    backward_dist = {destbox: 0}
+    # Initialization
+    forward_prev, backward_prev = {source_box: None}, {destination_box: None}
+    forward_points, backward_points = {source_box: source_point}, {destination_box: destination_point}
+    forward_distances, backward_distances = {source_box: 0}, {destination_box: 0}
 
-    visitedforward = set() # visited boxes
-    visitedbackward = set() 
-    
-    queue = PriorityQueue()
-    queue.put((0,sourcebox, "forward"))
-    queue.put((0,destbox, "backward"))
+    visited_forward, visited_backward = set(), set()
+    priority_queue = PriorityQueue()
+    priority_queue.put((0, source_box, "forward"))
+    priority_queue.put((0, destination_box, "backward"))
 
-    def construct_path(meetingbox):
-        forwardpath = [] # shortest path
-        currentbox = meetingbox
-        while currentbox != None: # gets path of boxes from dest to source
-            forwardpath.append(forward_points[currentbox])
-            currentbox = forward_prev[currentbox]
-        forwardpath.reverse() # reverses so its source to box instead
+    # Search loop
+    while not priority_queue.empty():
+        current_distance, current_box, direction = priority_queue.get()
 
-        backwardpath = []
-        currentbox = meetingbox
-        while currentbox != None: # gets path of boxes from dest to source
-            backwardpath.append(backward_points[currentbox])
-            currentbox = backward_prev[currentbox]
-        backwardpath.append(destination_point)
-
-        return forwardpath + backwardpath[1:]
-    
-
-    while not queue.empty():
-        currentdist, currentbox, currentdirection = queue.get()
-        if (currentdirection == "forward"):
-            visitedforward.add(currentbox)
+        if direction == "forward":
+            visited_forward.add(current_box)
         else:
-            visitedbackward.add(currentbox)
+            visited_backward.add(current_box)
 
-        if currentbox in visitedbackward and currentbox in visitedforward:
-            path = construct_path(currentbox)
-            return path, list(visitedforward | visitedbackward)
-        else:
-            for neighbor in mesh['adj'].get(currentbox,[]): # gets value of adjacent boxes for currentbox
-                if (currentdirection == "forward"):
-                    if neighbor in visitedforward:
-                        continue
-                    # finds neighboring closest point 
-                    neighborpoint = closest_point(forward_points[currentbox], currentbox, neighbor)
-                    newdist = currentdist + distance(neighborpoint, destination_point)
-                    # update dist and queue if shorter path found
-                    if (neighbor not in forward_dist or newdist < forward_dist[neighbor]):
-                        forward_dist[neighbor] = newdist
-                        forward_prev[neighbor] = currentbox
-                        forward_points[neighbor] = neighborpoint
-                        queue.put((newdist, neighbor, "forward"))
-                elif (currentdirection == "backward"):
-                    if neighbor in visitedbackward:
-                        continue
-                    # finds neighboring closest point 
-                    neighborpoint = closest_point(backward_points[currentbox], currentbox, neighbor)
-                    newdist = currentdist + distance(neighborpoint, source_point)
-                    # update dist and queue if shorter path found
-                    if (neighbor not in backward_dist or newdist < backward_dist[neighbor]):
-                        backward_dist[neighbor] = newdist
-                        backward_prev[neighbor] = currentbox
-                        backward_points[neighbor] = neighborpoint
-                        queue.put((newdist, neighbor, "backward"))
-    
-    print("No path!")
-    return [], []
+        # Check for meeting point
+        if current_box in visited_forward and current_box in visited_backward:
+            path = reconstruct_path(forward_prev, backward_prev, current_box, forward_points, backward_points, destination_point)
+            return path, list(visited_forward | visited_backward)
 
+        # Expand neighbors
+        for neighbor_box in mesh['adj'].get(current_box, []):
+            if direction == "forward":
+                if neighbor_box in visited_forward:
+                    continue
+                neighbor_point = closest_point(forward_points[current_box], neighbor_box)
+                new_distance = forward_distances[current_box] + euclidean_distance(forward_points[current_box], neighbor_point)
 
-# finds the closest point's distance
-def closest_point(point, box1, box2):
-    b1x1,b1x2,b1y1,b1y2 = box1
-    b2x1,b2x2,b2y1,b2y2 = box2
-    px,py = point
-    xrange = [max(b1x1, b2x1), min(b1x2, b2x2)]
-    yrange = [max(b1y1, b2y1), min(b1y2, b2y2)]
-    px = min(max(px, xrange[0]), xrange[1])
-    py = min(max(py, yrange[0]), yrange[1])
-    return [px, py]
+                if neighbor_box not in forward_distances or new_distance < forward_distances[neighbor_box]:
+                    forward_distances[neighbor_box] = new_distance
+                    forward_prev[neighbor_box] = current_box
+                    forward_points[neighbor_box] = neighbor_point
+                    heuristic = euclidean_distance(neighbor_point, destination_point)
+                    priority_queue.put((new_distance + heuristic, neighbor_box, "forward"))
 
-# finds distance between two points
-def distance(point1, point2):
-    x1, y1 = point1
-    x2, y2 = point2
-    return math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+            elif direction == "backward":
+                if neighbor_box in visited_backward:
+                    continue
+                neighbor_point = closest_point(backward_points[current_box], neighbor_box)
+                new_distance = backward_distances[current_box] + euclidean_distance(backward_points[current_box], neighbor_point)
+
+                if neighbor_box not in backward_distances or new_distance < backward_distances[neighbor_box]:
+                    backward_distances[neighbor_box] = new_distance
+                    backward_prev[neighbor_box] = current_box
+                    backward_points[neighbor_box] = neighbor_point
+                    heuristic = euclidean_distance(neighbor_point, source_point)
+                    priority_queue.put((new_distance + heuristic, neighbor_box, "backward"))
+
+    print("No path found!")
+    return [], list(visited_forward | visited_backward)

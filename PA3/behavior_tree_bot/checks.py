@@ -1,5 +1,8 @@
 
 
+import logging
+
+
 def if_neutral_planet_available(state):
     return any(state.neutral_planets())
 
@@ -13,10 +16,12 @@ def have_largest_fleet(state):
 def is_friendly_planet_under_attack(state):
   # Checks if any friendly planet is being targeted by enemy fleets.
   planets_under_attack = [
-    fleet.destination_planet for fleet in state.enemy_fleets()
-    if state.planets[fleet.destination_planet].owner == 1  # Check if the destination planet is mine
+      fleet.destination_planet for fleet in state.enemy_fleets()
+      if fleet.destination_planet in [planet.ID for planet in state.my_planets()]  # Compare IDs
   ]
-  print(planets_under_attack)
+  logging.info('\n' + "PLANETS UNDER ATTACK")
+  logging.info(planets_under_attack)
+  
   if not planets_under_attack:
       return False
   else:
@@ -26,7 +31,7 @@ def is_neutral_planet_under_attack(state):
     # Determines if enemy fleets are targeting a neutral planet.
     planets_under_attack = [
       fleet.destination_planet for fleet in state.enemy_fleets()
-      if state.planets[fleet.destination_planet].owner == 0  # Check if the destination planet is mine
+      if fleet.destination_planet in state.neutral_planets()  # Check if the destination planet is mine
     ]
     if not planets_under_attack:
        return False

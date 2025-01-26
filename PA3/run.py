@@ -67,7 +67,7 @@ if __name__ == '__main__':
     my_bot = 'behavior_tree_bot/bt_bot.py'
     show = len(sys.argv) < 2 or sys.argv[1] == "show"
     # test(my_bot, opponents[2], maps[2])
-    show_match(my_bot, opponents[2], maps[2])
+    show_match(my_bot, opponents[1], maps[2])
     # test(my_bot, do_nothing_bot, maps[2])
     # for opponent, map in zip(opponents, maps):
     #     # use this command if you want to observe the bots

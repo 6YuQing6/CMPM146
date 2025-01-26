@@ -32,9 +32,11 @@ def setup_behavior_tree():
     defensive_plan.child_nodes = [planet_under_attack_check, defend]
 
     offensive_plan = Sequence(name='Offensive Strategy')
-    largest_fleet_check = Check(have_largest_fleet)
+    # Sniper Strategy - only works if I have a larger planet
+    largest_fleet_check = Check(if_enemy_planet_snipable)
     attack = Action(attack_weakest_enemy_planet)
     offensive_plan.child_nodes = [largest_fleet_check, attack]
+    # Add Crowding Strategy - only works if I have a larger number
 
     spread_sequence = Sequence(name='Spread Strategy')
     neutral_planet_check = Check(if_neutral_planet_available)

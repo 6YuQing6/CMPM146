@@ -5,7 +5,21 @@ import logging
 
 def if_neutral_planet_available(state):
     return any(state.neutral_planets())
+    # needs to check if neutral planets already has fleets on the way and is able to conquer planet
 
+def if_enemy_planet_snipable(state):
+  # check if my strongest planet can conquer the weakest enemy planet
+  strongest_planet = max(state.my_planets(), key=lambda p: p.num_ships, default=None)
+
+  # Find the weakest enemy planet (one with the fewest ships)
+  weakest_enemy_planet = min(state.enemy_planets(), key=lambda p: p.num_ships, default=None)
+
+  if not strongest_planet or not weakest_enemy_planet:
+      # If there are no valid strongest or weakest planets, return False
+      return False
+
+  # Check if the strongest planet can conquer the weakest enemy planet
+  return strongest_planet.num_ships > weakest_enemy_planet.num_ships * 1.2
 
 def have_largest_fleet(state):
     return sum(planet.num_ships for planet in state.my_planets()) \
@@ -26,15 +40,4 @@ def is_friendly_planet_under_attack(state):
       return False
   else:
     return True
-
-def is_neutral_planet_under_attack(state):
-    # Determines if enemy fleets are targeting a neutral planet.
-    planets_under_attack = [
-      fleet.destination_planet for fleet in state.enemy_fleets()
-      if fleet.destination_planet in state.neutral_planets()  # Check if the destination planet is mine
-    ]
-    if not planets_under_attack:
-       return False
-    else:
-       return True
 

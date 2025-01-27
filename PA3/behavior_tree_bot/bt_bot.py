@@ -45,7 +45,7 @@ def setup_behavior_tree():
     
     conquest_sequence = Sequence(name='Conquest')
     fleet_check = Check(have_largest_fleet)
-    conquer = Action(covid)
+    conquer = Action(all_out_attack)
     conquest_sequence.child_nodes = [fleet_check, conquer]
     
     root.child_nodes = [defensive_plan, offensive_plan, spread_sequence, conquest_sequence, attack.copy()]

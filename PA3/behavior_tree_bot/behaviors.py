@@ -182,32 +182,6 @@ def send_reinforcements_to_weakest_planet_under_attack(state):
         min_req += (state.distance(closest_ally_planet.ID, weakest_planet.ID) * weakest_planet.growth_rate)
         return issue_order(state, closest_ally_planet.ID, weakest_planet.ID, min_req)
 
-def all_out_attack(state):
-    #try to destroy each planet one by one.
-    strong_to_weak_planet = iter(sorted(state.my_planets(), key=lambda p: p.num_ships))
-    enemy_planets = [planet for planet in state.enemy_planets()]
-    enemy_planets.sort(key=lambda p: p.num_ships)
-    target = iter(enemy_planets)
-    curr_strong = next(strong_to_weak_planet)
-
-    
-    planets_to_attack = [
-        fleet.destination_planet for fleet in state.my_fleets()
-        if state.planets[fleet.destination_planet].owner == 2]
-    
-    try:
-        target_planet = next(target)
-        while True:
-            required_ships = curr_strong.num_ships / 2
-            if(target_planet.num_ships > 0 and target_planet in planets_to_attack):
-                issue_order(state, curr_strong.ID, target_planet.ID, required_ships)
-                curr_strong = next(strong_to_weak_planet)
-                planets_to_attack.remove(target_planet)
-            else:
-                target_planet = next(target_planet)
-    except StopIteration:
-        return
-
 def take_small_enemy_planets(state):
     
     weakest_planet = min(state.enemy_planets(), key=lambda t: t.num_ships, default=None)
@@ -244,7 +218,8 @@ def defend_against_fleets(state):
                 if enemy_fleet.destination_planet == fleet.destination_planet)
         )
     ]
-def covid(state):
+def all_out_attack(state):
+    #sends 5 ships constantly from many different planets to one until conquered, and moves to the next one.
     strong_to_weak_planet = iter(sorted(state.my_planets(), key=lambda p: p.num_ships))
     enemy_planets = [planet for planet in state.enemy_planets()]
     enemy_planets.sort(key=lambda p: p.num_ships)

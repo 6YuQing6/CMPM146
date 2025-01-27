@@ -22,6 +22,7 @@ def if_enemy_planet_snipable(state):
   return strongest_planet.num_ships > weakest_enemy_planet.num_ships * 1.2
 
 def have_largest_fleet(state):
+    #do not use this when neutral planets exist.
     if(any(state.neutral_planets())):
        return False
     return sum(planet.num_ships for planet in state.my_planets()) \

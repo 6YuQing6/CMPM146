@@ -42,13 +42,13 @@ def setup_behavior_tree():
     neutral_planet_check = Check(if_neutral_planet_available)
     spread_action = Action(spread_many_to_closest_planet)
     spread_sequence.child_nodes = [neutral_planet_check, spread_action]
-    '''
+    
     conquest_sequence = Sequence(name='Conquest')
     fleet_check = Check(have_largest_fleet)
-    conquer = Action(all_out_attack)
+    conquer = Action(covid)
     conquest_sequence.child_nodes = [fleet_check, conquer]
-    '''
-    root.child_nodes = [defensive_plan, offensive_plan, spread_sequence, attack.copy()]
+    
+    root.child_nodes = [defensive_plan, offensive_plan, spread_sequence, conquest_sequence, attack.copy()]
 
     logging.info('\n' + root.tree_to_string())
     return root

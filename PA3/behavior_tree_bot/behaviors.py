@@ -60,6 +60,41 @@ def spread_to_most_growth_neutral_planet(state):
         # (4) Send half the ships from my strongest planet to the weakest enemy planet.
         return issue_order(state, strongest_planet.ID, growth_planet.ID, growth_planet.num_ships)
 
+def spread_many_to_closest_planet(state):
+    # Iterates through all my.planets() and spread to the closest values it can take. Similar to spread.bot, but focuses on distance.
+    strong_to_weak_planet = iter(sorted(state.my_planets(), key=lambda p: p.num_ships))
+    curr_strong = next(strong_to_weak_planet)
+    neutral_planets = [planet for planet in state.neutral_planets()
+                      if not any(fleet.destination_planet == planet.ID for fleet in state.my_fleets())]
+    neutral_planets.sort(key=lambda p: state.distance(p.ID, curr_strong.ID))
+    target = iter(neutral_planets)
+    count = 0
+
+    try:
+        target_planet = next(target)
+        while True:
+            required_ships = target_planet.num_ships + 1
+            
+            if curr_strong.num_ships > required_ships:
+                issue_order(state, curr_strong.ID, target_planet.ID, required_ships)
+                curr_strong = next(strong_to_weak_planet)
+                target_planet = next(target)
+            elif required_ships > curr_strong.num_ships and count < 3:
+                #This is a general check of the other 3 closest nodes. 
+                target_planet = next(target)
+                count += 1
+            else:
+                curr_strong = next(strong_to_weak_planet)
+                count = 0            
+                neutral_planets = [planet for planet in state.neutral_planets()
+                                if not any(fleet.destination_planet == planet.ID for fleet in state.my_fleets())]
+                neutral_planets.sort(key=lambda p: state.distance(p.ID, curr_strong.ID))
+                target = iter(neutral_planets)
+
+    except StopIteration:
+        return
+    
+
 
 def spread_to_closest_netural_planet(state):
     # Find the closest neutral planet to any of my planets that isn't already being conquered
@@ -146,4 +181,40 @@ def send_reinforcements_to_weakest_planet_under_attack(state):
     else:
         min_req += (state.distance(closest_ally_planet.ID, weakest_planet.ID) * weakest_planet.growth_rate)
         return issue_order(state, closest_ally_planet.ID, weakest_planet.ID, min_req)
+'''
+def all_out_attack(state):
+    #try to destroy each planet one by one.
+    strong_to_weak_planet = iter(sorted(state.my_planets(), key=lambda p: p.num_ships))
+    enemy_planets = [planet for planet in state.enemy_planets()]
+    enemy_planets.sort(key=lambda p: p.num_ships)
+    target = iter(enemy_planets)
+    curr_strong = next(strong_to_weak_planet)
+    try:
+        target_planet = next(target)
+        while True:
+            required_ships = curr_strong.num_ships / 2
+            if(target_planet.num_ships > 0 and ):
+                issue_order(state, curr_strong.ID, target_planet.ID, required_ships)
+                curr_strong = next(strong_to_weak_planet)
+            else:
+                target_planet = next(target_planet)
+    except StopIteration:
+        return
+    '''
+def take_small_enemy_planets(state):
+    
+    weakest_planet = min(state.enemy_planets(), key=lambda t: t.num_ships, default=None)
+    closest_planet = min(
+        (
+            closest for closest in state.my_planets()
+            if sum(fleet.num_ships for fleet in state.my_fleets() if fleet.destination_planet == weakest_planet.ID) > weakest_planet.num_ships
+        ),
+        key=lambda p: state.distance(p.ID, weakest_planet.ID),
+        default=None
+    )
 
+    if not closest_planet():
+        return False
+    
+    if closest_planet.num_ships > weakest_planet:
+        return issue_order(state, closest_planet.ID, weakest_planet.ID, closest_planet.num_ships - 1)

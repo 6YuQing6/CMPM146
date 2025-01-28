@@ -27,9 +27,16 @@ def setup_behavior_tree():
     root = Selector(name='High Level Ordering of Strategies')
 
     defensive_plan = Sequence(name='Defensive Strategy')
+    # Prioritize defending against enemy attacking my planets
     planet_under_attack_check = Check(is_friendly_planet_under_attack)
     defend = Action(send_reinforcements_to_weakest_planet_under_attack)
     defensive_plan.child_nodes = [planet_under_attack_check, defend]
+    
+    # Hijack against enemys attacking neutral planets 
+    hijack_plan = Sequence(name="Hijack Plan")
+    neutral_planet_under_attack_check = Check(is_neutral_planet_under_attack)
+    hijack_neutral = Action(send_reinforcements_to_neutral_planet_under_attack)
+    hijack_plan.child_nodes = [neutral_planet_under_attack_check, hijack_neutral]
 
     offensive_plan = Sequence(name='Offensive Strategy')
     # Sniper Strategy - only works if I have a larger planet
@@ -48,7 +55,7 @@ def setup_behavior_tree():
     conquer = Action(all_out_attack)
     conquest_sequence.child_nodes = [fleet_check, conquer]
     
-    root.child_nodes = [defensive_plan, offensive_plan, spread_sequence, conquest_sequence, attack.copy()]
+    root.child_nodes = [defensive_plan, offensive_plan, hijack_plan, spread_sequence, conquest_sequence, attack.copy()]
 
     logging.info('\n' + root.tree_to_string())
     return root

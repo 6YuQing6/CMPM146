@@ -44,3 +44,12 @@ def is_friendly_planet_under_attack(state):
   else:
     return True
 
+def is_neutral_planet_under_attack(state):
+    planets_under_attack = [
+        fleet.destination_planet for fleet in state.enemy_fleets()
+        if state.planets[fleet.destination_planet].owner == 0  # Only consider neutral planets
+    ]
+    if not planets_under_attack:
+      return False
+    else:
+      return True

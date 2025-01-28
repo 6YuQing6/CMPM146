@@ -5,17 +5,20 @@ import logging
 
 def attack_weakest_enemy_planet(state):
     strongest_planet = max(state.my_planets(), key=lambda t: t.num_ships, default=None)
-
     weakest_planet = min(state.enemy_planets(), key=lambda t: t.num_ships, default=None)
 
     if not strongest_planet or not weakest_planet:
         return False
+    enemy_support = sum([fleet for fleet in state.enemy_fleets()
+        if fleet.destination_planet == weakest_planet.ID
+    ])
+
+    min_amount = weakest_planet.num_ships + enemy_support + (state.distance(strongest_planet.ID, weakest_planet.ID) * weakest_planet.growth_rate) + 1
     
+    # If already sniping don't snipe
     if any(weakest_planet.ID == fleet.destination_planet for fleet in state.my_fleets()):
         return False
-
-    min_amount = weakest_planet.num_ships + (state.distance(strongest_planet.ID, weakest_planet.ID) * weakest_planet.growth_rate) + 1
-
+    
     return issue_order(state, strongest_planet.ID, weakest_planet.ID, min_amount)
 
 
@@ -182,6 +185,60 @@ def send_reinforcements_to_weakest_planet_under_attack(state):
         min_req += (state.distance(closest_ally_planet.ID, weakest_planet.ID) * weakest_planet.growth_rate)
         return issue_order(state, closest_ally_planet.ID, weakest_planet.ID, min_req)
 
+
+# first find the netural planets that are going to be taken over by enemy
+    # neutral_planet.num_ships - enemy_fleets size > 0
+# calculate the distance it takes for the enemy fleet to arrive
+# calculate the distance it takes for your planets with 
+    #  neutral_planet.num_ships - enemy_fleets size + 1 num_ships to arrive
+# send fleets from the planets that are enough distance away that the enemy's fleet will get to the neutral planet first
+    # fleet size =  neutral_planet.num_ships - enemy_fleets size + 1 + (distance_from_enemy_fleet_to_neutral - distance_from_my_fleet_to_neutral) * neutral_growth_rate
+
+def send_reinforcements_to_neutral_planet_under_attack(state):
+    # Find all neutral planets that are about to be taken over by enemy fleets
+    planets_under_attack = [
+        fleet.destination_planet for fleet in state.enemy_fleets()
+        if state.planets[fleet.destination_planet].owner == 0  # Neutral planets
+        and sum(f.num_ships for f in state.enemy_fleets() if f.destination_planet == fleet.destination_planet) >= state.planets[fleet.destination_planet].num_ships
+    ]
+
+    if not planets_under_attack:
+        return False
+
+    # Find the planet that has the most growth rate
+    neutral_planet = max(
+        (state.planets[planet_id] for planet_id in planets_under_attack),
+        key=lambda p: p.growth_rate,
+        default=None
+    )
+
+    # Calculate the time for the enemy fleet to arrive
+    enemy_arrival_time = max(
+        fleet.turns_remaining for fleet in state.enemy_fleets() if fleet.destination_planet == neutral_planet.ID
+    )
+
+    # Find the friendly planets thats have enough ships and arrival time is > enemy_arrival_time
+    strongest_planet = max(
+        (planet for planet in state.my_planets() 
+         if state.distance(planet.ID, neutral_planet.ID) > enemy_arrival_time
+         and planet.num_ships > (state.distance(planet.ID, neutral_planet.ID) - enemy_arrival_time) * neutral_planet.growth_rate),
+        key=lambda p: p.num_ships,
+        default=None
+    )
+
+    if not strongest_planet:
+        return False
+    
+    # Calculate distance / turns it takes between my planet and neutral
+    friendly_arrival_time = state.distance(strongest_planet.ID, neutral_planet.ID)
+
+    # Calculate the number of ships to send
+    ships_to_send = ((friendly_arrival_time - enemy_arrival_time) * neutral_planet.growth_rate + 1)
+
+    # Send the fleet
+    return issue_order(state, strongest_planet.ID, neutral_planet.ID, ships_to_send)
+
+
 def take_small_enemy_planets(state):
     
     weakest_planet = min(state.enemy_planets(), key=lambda t: t.num_ships, default=None)
@@ -218,9 +275,10 @@ def defend_against_fleets(state):
                 if enemy_fleet.destination_planet == fleet.destination_planet)
         )
     ]
+    
 def all_out_attack(state):
     #sends 5 ships constantly from many different planets to one until conquered, and moves to the next one.
-    strong_to_weak_planet = iter(sorted(state.my_planets(), key=lambda p: p.num_ships))
+    strong_to_weak_planet = iter(sorted(state.my_planets(), key=lambda p: p.num_ships, reverse=True))
     enemy_planets = [planet for planet in state.enemy_planets()]
     enemy_planets.sort(key=lambda p: p.num_ships)
     target = iter(enemy_planets)
@@ -229,7 +287,7 @@ def all_out_attack(state):
     try:
         target_planet = next(target)
         while True:
-            required_ships = 5
+            required_ships = max(curr_strong.growth_rate, target_planet.growth_rate, 5)
             if(target_planet.num_ships > 0):
                 issue_order(state, curr_strong.ID, target_planet.ID, required_ships)
                 curr_strong = next(strong_to_weak_planet)

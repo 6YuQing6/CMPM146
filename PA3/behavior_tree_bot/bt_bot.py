@@ -55,7 +55,15 @@ def setup_behavior_tree():
     conquer = Action(all_out_attack)
     conquest_sequence.child_nodes = [fleet_check, conquer]
     
-    root.child_nodes = [defensive_plan, offensive_plan, hijack_plan, spread_sequence, conquest_sequence, attack.copy()]
+    # maybe have more aggressive spreading strat in the beginning of the game
+    
+    # maybe add a support weaker planets strat?
+    # support_sequence = Sequence(name='Support')
+    # support_check = Check(have_weak_planets)
+    # support = Action(support_weaker_planets)
+    # support_sequence.child_nodes = [support_check, support]
+    
+    root.child_nodes = [defensive_plan, offensive_plan, hijack_plan, conquest_sequence, spread_sequence, attack.copy()]
 
     logging.info('\n' + root.tree_to_string())
     return root

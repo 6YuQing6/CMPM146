@@ -63,16 +63,17 @@ if __name__ == '__main__':
     do_nothing_bot = 'opponent_bots/do_nothing_bot.py'
 
     maps = [71, 13, 24, 56, 7]
+    # maps = [1, 2, 3, 4, 5]
 
     my_bot = 'behavior_tree_bot/bt_bot.py'
     show = len(sys.argv) < 2 or sys.argv[1] == "show"
     # test(my_bot, opponents[2], maps[2])
-    show_match(my_bot, opponents[3], maps[2])
+    # show_match(my_bot, opponents[2], maps[2])
     # test(my_bot, do_nothing_bot, maps[2])
-    # for opponent, map in zip(opponents, maps):
-    #     # use this command if you want to observe the bots
-    #     if show:
-    #         show_match(my_bot, opponent, map)
-    #     else:
-    #         # use this command if you just want the results of the matches reported
-    #         test(my_bot, opponent, map)
+    for opponent, map in zip(opponents, maps):
+        # use this command if you want to observe the bots
+        if show:
+            show_match(my_bot, opponent, map)
+        else:
+            # use this command if you just want the results of the matches reported
+            test(my_bot, opponent, map)

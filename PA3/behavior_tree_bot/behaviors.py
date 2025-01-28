@@ -9,7 +9,7 @@ def attack_weakest_enemy_planet(state):
 
     if not strongest_planet or not weakest_planet:
         return False
-    enemy_support = sum([fleet for fleet in state.enemy_fleets()
+    enemy_support = sum([fleet.num_ships for fleet in state.enemy_fleets()
         if fleet.destination_planet == weakest_planet.ID
     ])
 
@@ -185,7 +185,6 @@ def send_reinforcements_to_weakest_planet_under_attack(state):
         min_req += (state.distance(closest_ally_planet.ID, weakest_planet.ID) * weakest_planet.growth_rate)
         return issue_order(state, closest_ally_planet.ID, weakest_planet.ID, min_req)
 
-
 # first find the netural planets that are going to be taken over by enemy
     # neutral_planet.num_ships - enemy_fleets size > 0
 # calculate the distance it takes for the enemy fleet to arrive
@@ -193,7 +192,6 @@ def send_reinforcements_to_weakest_planet_under_attack(state):
     #  neutral_planet.num_ships - enemy_fleets size + 1 num_ships to arrive
 # send fleets from the planets that are enough distance away that the enemy's fleet will get to the neutral planet first
     # fleet size =  neutral_planet.num_ships - enemy_fleets size + 1 + (distance_from_enemy_fleet_to_neutral - distance_from_my_fleet_to_neutral) * neutral_growth_rate
-
 def send_reinforcements_to_neutral_planet_under_attack(state):
     # Find all neutral planets that are about to be taken over by enemy fleets
     planets_under_attack = [
@@ -294,4 +292,4 @@ def all_out_attack(state):
             else:
                 target_planet = next(target)
     except StopIteration:
-        return
+        return False

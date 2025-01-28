@@ -17,9 +17,10 @@ def if_enemy_planet_snipable(state):
   if not strongest_planet or not weakest_enemy_planet:
       # If there are no valid strongest or weakest planets, return False
       return False
+  enemy_planet_reinforcements = sum(fleet.num_ships for fleet in state.enemy_fleets() if fleet.destination_planet == weakest_enemy_planet.ID)
 
   # Check if the strongest planet can conquer the weakest enemy planet
-  return strongest_planet.num_ships > weakest_enemy_planet.num_ships * 1.2
+  return strongest_planet.num_ships > (weakest_enemy_planet.num_ships + enemy_planet_reinforcements)
 
 def have_largest_fleet(state):
     #do not use this when neutral planets exist.

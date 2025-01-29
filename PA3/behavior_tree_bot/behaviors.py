@@ -21,6 +21,33 @@ def attack_weakest_enemy_planet(state):
     
     return issue_order(state, strongest_planet.ID, weakest_planet.ID, min_amount)
 
+def like_agressive(state):
+
+    my_planets = iter(sorted(state.my_planets(), key=lambda p: p.num_ships))
+
+    enemy_planets = [planet for planet in state.enemy_planets()
+                      if not any(fleet.destination_planet == planet.ID for fleet in state.my_fleets())]
+    enemy_planets.sort(key=lambda p: p.num_ships)
+
+    target_planets = iter(enemy_planets)
+
+    try:
+        my_planet = next(my_planets)
+        target_planet = next(target_planets)
+        while True:
+            required_ships = target_planet.num_ships + \
+                                 state.distance(my_planet.ID, target_planet.ID) * target_planet.growth_rate + 1
+            if(state.distance(my_planet.ID, target_planet.ID) > 30):
+                return False
+            if my_planet.num_ships > required_ships:
+                issue_order(state, my_planet.ID, target_planet.ID, required_ships)
+                my_planet = next(my_planets)
+                target_planet = next(target_planets)
+            else:
+                my_planet = next(my_planets)
+
+    except StopIteration:
+        return True
 
 def spread_to_weakest_neutral_planet(state):
     # Find the weakest neutral planet that isn't already being conquered

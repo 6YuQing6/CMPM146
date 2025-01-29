@@ -239,7 +239,8 @@ def send_reinforcements_to_weakest_planet_under_attack(state):
         return issue_order(state, closest_ally_planet.ID, weakest_planet.ID, min_req)
 
 def send_many_reinforcements_to_planets_under_attack(state):
-    #does the same as above, but tries to defend with many planets
+    #Defends against attacks using multiple planets, makes sure it doesn't get captured.
+    #is based on the code above, as it can defend but only with one planet.
     planets_under_attack = [
         state.planets[fleet.destination_planet] for fleet in state.enemy_fleets()
         if state.planets[fleet.destination_planet].owner == 1  # Only consider your planets
@@ -254,32 +255,38 @@ def send_many_reinforcements_to_planets_under_attack(state):
             < sum(enemy_fleet.num_ships for enemy_fleet in state.enemy_fleets()
                 if enemy_fleet.destination_planet == fleet.destination_planet)
         )
-    ]    
+    ]
+
     if not planets_under_attack:
         return False
-    logging.info('enemy time')
+    
     planets_under_attack.sort(key=lambda p: p.num_ships)
     under_attack = iter(planets_under_attack)
     count = 0
     try:
         attacked = next(under_attack)
         while True:
-            
+            #how many many ships are being sent to planet under attack
             enemy_support = sum([fleet.num_ships for fleet in state.enemy_fleets()
                 if fleet.destination_planet == attacked.ID
             ])
-            
+
+            #how long it takes for the furthest enemy fleet to arrive. 
+            #Using furtherest fleet allows for more fleets to respond. 
             enemy_time = max([fleet.total_trip_length for fleet in state.enemy_fleets()
                 if fleet.destination_planet == attacked.ID
             ])
             
+            #all ally planets that can react before all enemy fleets can attack a planet
             closest_allies = [planet for planet in state.my_planets()
                 if (state.distance(attacked.ID, planet.ID) <= enemy_time)]  
+            #cannot counter attack a planet that cannot be reacted to.
             if not closest_allies:
                 return False
             
             closest_allies.sort(key=lambda p: p.num_ships, reverse=True)
             
+            #this check allows to see if a planet can be reasonably defended. If not, send all of it's ships to the strongest planet.
             check = sum(allies.num_ships for allies in closest_allies) / 2
             if(check < enemy_support):
                 issue_order(state, attacked.ID, closest_allies[0].ID, attacked.num_ships)
@@ -288,14 +295,15 @@ def send_many_reinforcements_to_planets_under_attack(state):
             ally_support = sum([fleet.num_ships for fleet in state.my_fleets()
                 if fleet.destination_planet == attacked.ID
             ])
+            #have all allies send half of their ships to attacked planet until no longer needed. Will not return true, as this will repeat for other planets
+            #until iteration stops.
             for allies in closest_allies:
-                count = ally_support
+                count = ally_support + attacked.num_ships
                 if count > enemy_support:
-                    return True
+                    return False
                 elif enemy_support > count:
                     issue_order(state, allies.ID, attacked.ID, allies.num_ships / 2)
             return False
-
             
     except StopIteration:
         return False
@@ -357,26 +365,8 @@ def send_reinforcements_to_neutral_planet_under_attack(state):
         return issue_order(state, strongest_planet.ID, neutral_planet.ID, ships_to_send)
 
 
-def take_small_enemy_planets(state):
-    
-    weakest_planet = min(state.enemy_planets(), key=lambda t: t.num_ships, default=None)
-    closest_planet = min(
-        (
-            closest for closest in state.my_planets()
-            if sum(fleet.num_ships for fleet in state.my_fleets() if fleet.destination_planet == weakest_planet.ID) > weakest_planet.num_ships
-        ),
-        key=lambda p: state.distance(p.ID, weakest_planet.ID),
-        default=None
-    )
-
-    if not closest_planet():
-        return False
-    
-    if closest_planet.num_ships > weakest_planet:
-        return issue_order(state, closest_planet.ID, weakest_planet.ID, closest_planet.num_ships - 1)
-    
 def all_out_attack(state):
-    #sends 5 ships constantly from many different planets to one until conquered, and moves to the next one.
+    #sends 3 ships constantly from many different planets to one until conquered, and moves to the next one.
     strong_to_weak_planet = iter(sorted(state.my_planets(), key=lambda p: p.num_ships, reverse=True))
 
     if not strong_to_weak_planet:
@@ -394,6 +384,7 @@ def all_out_attack(state):
         curr_strong = next(strong_to_weak_planet)
         target_planet = next(target)
         while True:
+            #though 3 is slower, it is less risky than any other number.
             required_ships = 3
             enemy_support = sum([fleet.num_ships for fleet in state.enemy_fleets()
                 if fleet.destination_planet == target_planet.ID
@@ -407,5 +398,6 @@ def all_out_attack(state):
                 curr_strong = next(strong_to_weak_planet)
             else:
                 target_planet = next(target)
+
     except StopIteration:
         return False

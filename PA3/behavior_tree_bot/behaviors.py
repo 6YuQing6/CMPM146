@@ -103,9 +103,20 @@ def spread_to_most_growth_neutral_planet(state):
 def spread_many_to_closest_planet(state):
     # Iterates through all my.planets() and spread to the closest values it can take. Similar to spread.bot, but focuses on distance.
     strong_to_weak_planet = iter(sorted(state.my_planets(), key=lambda p: p.num_ships))
-    curr_strong = next(strong_to_weak_planet)
+
+    if not strong_to_weak_planet:
+        return False
+    try:
+        curr_strong = next(strong_to_weak_planet)
+    except StopIteration:
+        return False
+    
     neutral_planets = [planet for planet in state.neutral_planets()
                       if not any(fleet.destination_planet == planet.ID for fleet in state.my_fleets())]
+    
+    if not neutral_planets:
+        return False
+    
     neutral_planets.sort(key=lambda p: state.distance(p.ID, curr_strong.ID))
     target = iter(neutral_planets)
     count = 0
@@ -119,15 +130,20 @@ def spread_many_to_closest_planet(state):
                 issue_order(state, curr_strong.ID, target_planet.ID, required_ships)
                 curr_strong = next(strong_to_weak_planet)
                 target_planet = next(target)
+                count = 0
             elif required_ships > curr_strong.num_ships and count < 3:
                 #This is a general check of the other 3 closest nodes. 
-                target_planet = next(target)
+                target_planet = next(target)    
                 count += 1
             else:
                 curr_strong = next(strong_to_weak_planet)
                 count = 0            
                 neutral_planets = [planet for planet in state.neutral_planets()
                                 if not any(fleet.destination_planet == planet.ID for fleet in state.my_fleets())]
+                
+                if not neutral_planets:
+                    return False
+    
                 neutral_planets.sort(key=lambda p: state.distance(p.ID, curr_strong.ID))
                 target = iter(neutral_planets)
 
@@ -222,6 +238,68 @@ def send_reinforcements_to_weakest_planet_under_attack(state):
         min_req += (state.distance(closest_ally_planet.ID, weakest_planet.ID) * weakest_planet.growth_rate)
         return issue_order(state, closest_ally_planet.ID, weakest_planet.ID, min_req)
 
+def send_many_reinforcements_to_planets_under_attack(state):
+    #does the same as above, but tries to defend with many planets
+    planets_under_attack = [
+        state.planets[fleet.destination_planet] for fleet in state.enemy_fleets()
+        if state.planets[fleet.destination_planet].owner == 1  # Only consider your planets
+        and (
+            # Case 1: No incoming friendly fleets
+            sum(ally_fleet.num_ships for ally_fleet in state.my_fleets()
+                if ally_fleet.destination_planet == fleet.destination_planet) == 0
+            or
+            # Case 2: Incoming friendly fleets are insufficient
+            sum(ally_fleet.num_ships for ally_fleet in state.my_fleets()
+                if ally_fleet.destination_planet == fleet.destination_planet)
+            < sum(enemy_fleet.num_ships for enemy_fleet in state.enemy_fleets()
+                if enemy_fleet.destination_planet == fleet.destination_planet)
+        )
+    ]    
+    if not planets_under_attack:
+        return False
+    logging.info('enemy time')
+    planets_under_attack.sort(key=lambda p: p.num_ships)
+    under_attack = iter(planets_under_attack)
+    count = 0
+    try:
+        attacked = next(under_attack)
+        while True:
+            
+            enemy_support = sum([fleet.num_ships for fleet in state.enemy_fleets()
+                if fleet.destination_planet == attacked.ID
+            ])
+            
+            enemy_time = max([fleet.total_trip_length for fleet in state.enemy_fleets()
+                if fleet.destination_planet == attacked.ID
+            ])
+            
+            closest_allies = [planet for planet in state.my_planets()
+                if (state.distance(attacked.ID, planet.ID) <= enemy_time)]  
+            if not closest_allies:
+                return False
+            
+            closest_allies.sort(key=lambda p: p.num_ships, reverse=True)
+            
+            check = sum(allies.num_ships for allies in closest_allies) / 2
+            if(check < enemy_support):
+                issue_order(state, attacked.ID, closest_allies[0].ID, attacked.num_ships)
+                return False
+            
+            ally_support = sum([fleet.num_ships for fleet in state.my_fleets()
+                if fleet.destination_planet == attacked.ID
+            ])
+            for allies in closest_allies:
+                count = ally_support
+                if count > enemy_support:
+                    return True
+                elif enemy_support > count:
+                    issue_order(state, allies.ID, attacked.ID, allies.num_ships / 2)
+            return False
+
+            
+    except StopIteration:
+        return False
+    
 
 # first find the netural planets that are going to be taken over by enemy
     # neutral_planet.num_ships - enemy_fleets size > 0
@@ -272,7 +350,11 @@ def send_reinforcements_to_neutral_planet_under_attack(state):
     ships_to_send = ((friendly_arrival_time - enemy_arrival_time) * neutral_planet.growth_rate + 2)
 
     # Send the fleet
-    return issue_order(state, strongest_planet.ID, neutral_planet.ID, ships_to_send)
+    if(friendly_arrival_time > 20):
+        #tries not to send fleets too far away or too expensive.
+        return False
+    else:
+        return issue_order(state, strongest_planet.ID, neutral_planet.ID, ships_to_send)
 
 
 def take_small_enemy_planets(state):
@@ -293,38 +375,34 @@ def take_small_enemy_planets(state):
     if closest_planet.num_ships > weakest_planet:
         return issue_order(state, closest_planet.ID, weakest_planet.ID, closest_planet.num_ships - 1)
     
-def defend_against_fleets(state):
-    #when fleet is under attack, 
-    
-    planets_under_attack = [
-        fleet.destination_planet for fleet in state.enemy_fleets()
-        if state.planets[fleet.destination_planet].owner == 1  # Only consider your planets
-        and (
-            # Case 1: No incoming friendly fleets
-            sum(ally_fleet.num_ships for ally_fleet in state.my_fleets()
-                if ally_fleet.destination_planet == fleet.destination_planet) == 0
-            or
-            # Case 2: Incoming friendly fleets are insufficient
-            sum(ally_fleet.num_ships for ally_fleet in state.my_fleets()
-                if ally_fleet.destination_planet == fleet.destination_planet)
-            < sum(enemy_fleet.num_ships for enemy_fleet in state.enemy_fleets()
-                if enemy_fleet.destination_planet == fleet.destination_planet)
-        )
-    ]
-    
 def all_out_attack(state):
     #sends 5 ships constantly from many different planets to one until conquered, and moves to the next one.
     strong_to_weak_planet = iter(sorted(state.my_planets(), key=lambda p: p.num_ships, reverse=True))
+
+    if not strong_to_weak_planet:
+        return False
+
     enemy_planets = [planet for planet in state.enemy_planets()]
+
+    if not enemy_planets:
+        return False
+
     enemy_planets.sort(key=lambda p: p.num_ships)
     target = iter(enemy_planets)
-    curr_strong = next(strong_to_weak_planet)
-
+    
     try:
+        curr_strong = next(strong_to_weak_planet)
         target_planet = next(target)
         while True:
-            required_ships = max(curr_strong.growth_rate, target_planet.growth_rate, 5)
-            if(target_planet.num_ships > 0):
+            required_ships = 3
+            enemy_support = sum([fleet.num_ships for fleet in state.enemy_fleets()
+                if fleet.destination_planet == target_planet.ID
+            ])
+            ally_support = sum([fleet.num_ships for fleet in state.my_fleets()
+                if fleet.destination_planet == target_planet.ID
+            ])
+            planet_gone = target_planet.num_ships + enemy_support - ally_support
+            if(target_planet.num_ships > 0 or planet_gone >= 0):
                 issue_order(state, curr_strong.ID, target_planet.ID, required_ships)
                 curr_strong = next(strong_to_weak_planet)
             else:

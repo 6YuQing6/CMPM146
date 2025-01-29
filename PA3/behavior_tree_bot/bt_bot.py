@@ -29,7 +29,7 @@ def setup_behavior_tree():
     defensive_plan = Sequence(name='Defensive Strategy')
     # Prioritize defending against enemy attacking my planets
     planet_under_attack_check = Check(is_friendly_planet_under_attack)
-    defend = Action(send_reinforcements_to_weakest_planet_under_attack)
+    defend = Action(send_many_reinforcements_to_planets_under_attack)
     defensive_plan.child_nodes = [planet_under_attack_check, defend]
     
     # Hijack against enemys attacking neutral planets 
@@ -63,7 +63,7 @@ def setup_behavior_tree():
     # support = Action(support_weaker_planets)
     # support_sequence.child_nodes = [support_check, support]
     
-    root.child_nodes = [defensive_plan, offensive_plan, hijack_plan, conquest_sequence, spread_sequence, attack.copy()]
+    root.child_nodes = [defensive_plan, offensive_plan, hijack_plan, spread_sequence, conquest_sequence, attack.copy()]
 
     logging.info('\n' + root.tree_to_string())
     return root

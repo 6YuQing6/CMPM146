@@ -1,7 +1,6 @@
 import sys
 sys.path.insert(0, '../')
 from planet_wars import issue_order
-import logging
 
 def attack_weakest_enemy_planet(state):
     strongest_planet = max(state.my_planets(), key=lambda t: t.num_ships, default=None)
@@ -61,71 +60,27 @@ def spread_to_weakest_neutral_planet(state):
     )
     
     if not weakest_neutral:
-        # No neutral planets available
         return False
 
-    # Find the strongest allied planet to send ships from
     strongest_planet = max(state.my_planets(), key=lambda p: p.num_ships, default=None)
 
     if not strongest_planet or strongest_planet.num_ships <= 1:
-        # No friendly planet with enough ships to send
         return False
 
-    # Issue the order to send ships to the weakest neutral planet
     result = issue_order(state, strongest_planet.ID, weakest_neutral.ID, weakest_neutral.num_ships +  (state.distance(strongest_planet.ID, weakest_neutral.ID) * weakest_neutral.growth_rate) + 1)
     return result
 
 
 def spread_to_most_growth_neutral_planet(state):
-    # (2) Find my strongest planet.
     strongest_planet = max(state.my_planets(), key=lambda p: p.num_ships, default=None)
 
-    # (3) Find the weakest neutral planet.
     growth_planet = min(state.neutral_planets(), key=lambda p: p.growth_rate, default=None)
 
     if not strongest_planet or not growth_planet or strongest_planet.num_ships < growth_planet.num_ships + 1:
-        # No legal source or destination
         return False
     else:
-        # (4) Send half the ships from my strongest planet to the weakest enemy planet.
         return issue_order(state, strongest_planet.ID, growth_planet.ID, growth_planet.num_ships)
 
-
-# replacement bc it sometimes crashes
-# def spread_many_to_closest_planet(state):
-#     # Sort my planets from strongest to weakest
-#     my_planets = sorted(state.my_planets(), key=lambda p: p.num_ships, reverse=True)
-    
-#     # Get neutral planets that are not already being targeted
-#     neutral_planets = [
-#         planet for planet in state.neutral_planets()
-#         if not any(fleet.destination_planet == planet.ID for fleet in state.my_fleets())
-#     ]
-
-#     if not neutral_planets:
-#         return False  # No neutral planets available
-
-#     # Iterate through my planets and try to spread to the closest neutral planet
-#     for my_planet in my_planets:
-#         if my_planet.num_ships <= 1:
-#             continue  # Skip planets with too few ships
-
-#         # Sort neutral planets by distance to the current my_planet
-#         neutral_planets_sorted = sorted(
-#             neutral_planets,
-#             key=lambda p: state.distance(my_planet.ID, p.ID)
-#         )
-
-#         # Try to find a neutral planet to attack
-#         for neutral_planet in neutral_planets_sorted:
-#             required_ships = neutral_planet.num_ships + 1
-
-#             if my_planet.num_ships > required_ships:
-#                 # Issue the order to spread to the neutral planet
-#                 issue_order(state, my_planet.ID, neutral_planet.ID, required_ships)
-#                 break  # Move to the next my_planet after issuing an order
-
-#     return True
 
 def spread_many_to_closest_planet(state):
     # Iterates through all my.planets() and spread to the closest values it can take. Similar to spread.bot, but focuses on distance.
@@ -191,7 +146,6 @@ def spread_to_closest_netural_planet(state):
     )
     
     if not closest_neutral:
-        # No neutral planets available
         return False
 
     # Find the strongest allied planet to neutral planet
@@ -206,8 +160,6 @@ def spread_to_closest_netural_planet(state):
     result = issue_order(state, strongest_planet.ID, closest_neutral.ID, closest_neutral.num_ships + 1)
     return result
 
-# needs to check if already defending the attacked planet
-# could also change weakest planet to be the planet that is about to be taken over by a fleet
 def send_reinforcements_to_weakest_planet_under_attack(state):
     # Find all planets under attack
     # *** fleet.destination_planet is the planet ID NOT the planet itself...
@@ -237,16 +189,10 @@ def send_reinforcements_to_weakest_planet_under_attack(state):
         default=None
     )
     
-    logging.info('\n' + "WEAKEST PLANET")
-    logging.info(weakest_planet)
-    
     # Find all fleets that are attacking weakest_planet
     attacking_fleets = [fleet for fleet in state.enemy_fleets()
          if fleet.destination_planet in [planet.ID for planet in state.my_planets()]
     ]
-    
-    logging.info('\n' + "ATTACKING FLEETS")
-    logging.info(attacking_fleets)
 
     # Find the max fleet size
     min_req = sum([fleet.num_ships for fleet in attacking_fleets]) + 1
@@ -336,13 +282,7 @@ def send_many_reinforcements_to_planets_under_attack(state):
         return False
     
 
-# first find the netural planets that are going to be taken over by enemy
-    # neutral_planet.num_ships - enemy_fleets size > 0
-# calculate the distance it takes for the enemy fleet to arrive
-# calculate the distance it takes for your planets with 
-    #  neutral_planet.num_ships - enemy_fleets size + 1 num_ships to arrive
-# send fleets from the planets that are enough distance away that the enemy's fleet will get to the neutral planet first
-    # fleet size =  neutral_planet.num_ships - enemy_fleets size + 1 + (distance_from_enemy_fleet_to_neutral - distance_from_my_fleet_to_neutral) * neutral_growth_rate
+
 def send_reinforcements_to_neutral_planet_under_attack(state):
     # Find all neutral planets that are about to be taken over by enemy fleets
     planets_under_attack = [
@@ -381,10 +321,8 @@ def send_reinforcements_to_neutral_planet_under_attack(state):
     # Calculate distance / turns it takes between my planet and neutral
     friendly_arrival_time = state.distance(strongest_planet.ID, neutral_planet.ID)
 
-    # Calculate the number of ships to send
     ships_to_send = ((friendly_arrival_time - enemy_arrival_time) * neutral_planet.growth_rate + 2)
 
-    # Send the fleet
     if(friendly_arrival_time > 20):
         #tries not to send fleets too far away or too expensive.
         return False

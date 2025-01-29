@@ -37,8 +37,6 @@ def is_friendly_planet_under_attack(state):
       fleet.destination_planet for fleet in state.enemy_fleets()
       if fleet.destination_planet in [planet.ID for planet in state.my_planets()]  # Compare IDs
   ]
-  logging.info('\n' + "PLANETS UNDER ATTACK")
-  logging.info(planets_under_attack)
   
   if not planets_under_attack:
       return False

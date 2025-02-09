@@ -345,10 +345,42 @@ Individual = Individual_Grid
 
 def generate_successors(population):
     results = []
+    roulette_selection(population, population.size)
+    
     # STUDENT Design and implement this
     # Hint: Call generate_children() on some individuals and fill up results.
     return results
 
+# Selection Method for generate_successors
+# Chooses based on probabilty of (individual fitness / total population fitness)
+# Reference: https://cratecode.com/info/roulette-wheel-selection
+def roulette_selection(population, size: int):
+    print(population)
+    results = []
+    total_fitness = sum(i.fitness() for i in population)
+    
+    # make cummulative probability distribution (to choose based on probability range)
+    selection_probs = [i.fitness() / total_fitness for i in population]
+    cumm_probs = []
+    cumm_sum = 0
+    for prob in selection_probs:
+        cumm_sum += prob
+        cumm_probs.append(cumm_sum)
+
+    def select_parent():
+        r = random.random() # random number between 0 and 1
+        for i, p in enumerate(cumm_probs):
+            if r <= p:
+                return population[i]
+            
+    for i in range(size):
+        parent1 = select_parent()
+        parent2 = select_parent()
+        gene = random.randint(0, 1)
+        child = parent1.generate_children(parent2)[gene]
+        results.append(child)
+
+    return results
 
 def ga():
     # STUDENT Feel free to play with this parameter
@@ -384,7 +416,7 @@ def ga():
                     print("Max fitness:", str(best.fitness()))
                     print("Average generation time:", (now - start) / generation)
                     print("Net time:", now - start)
-                    with open("levels/last.txt", 'w') as f:
+                    with open("levels/last.txt", 'w+') as f:
                         for row in best.to_level():
                             f.write("".join(row) + "\n")
                 generation += 1

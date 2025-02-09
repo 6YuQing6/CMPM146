@@ -77,7 +77,7 @@ class Individual_Grid(object):
                     yi = y + 1
                     while yi < height:
                         yi += 1
-                        if genome[yi][x] == "X":
+                        if genome[yi][x] in ["X", "|"]:
                             break
                         else:
                             genome[yi][x] = "|"

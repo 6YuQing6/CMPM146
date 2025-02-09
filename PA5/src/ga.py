@@ -345,14 +345,17 @@ Individual = Individual_Grid
 
 def generate_successors(population):
     results = []
-    roulette_selection(population, population.size)
+    # creates children from population
+    results.append(roulette_selection(population, len(population)))
+    # chooses top 10% of indiviudals in current pop to stay
+    results.append(elitist_selection(population, 0.1))
     
     # STUDENT Design and implement this
     # Hint: Call generate_children() on some individuals and fill up results.
     return results
 
 # Selection Method for generate_successors
-# Chooses based on probabilty of (individual fitness / total population fitness)
+# Roulette Selection: Chooses based on probabilty of (individual fitness / total population fitness)
 # Reference: https://cratecode.com/info/roulette-wheel-selection
 def roulette_selection(population, size: int):
     print(population)
@@ -380,6 +383,27 @@ def roulette_selection(population, size: int):
         child = parent1.generate_children(parent2)[gene]
         results.append(child)
 
+    return results
+
+# Selection Method for generate_successors
+# Elitist Selection: Chooses based on top fitness individuals and does not mutate them
+# Reference: https://algorithmafternoon.com/genetic/elitist_genetic_algorithm/
+'''
+Parameters: 
+    elite_percent (what percent of population is chosen to stay)
+'''
+def elitist_selection(population, elite_percent: float):
+    if not (0 < elite_percent <= 1):
+        raise ValueError("elite_percent must be between 0 and 1")
+    results = []
+    pop_limit = len(population)
+    
+    sorted_population = sorted(population, key=Individual.fitness, reverse=True)
+    
+    # keeps the best fitness individuals
+    elite_count = max(1, int(pop_limit * elite_percent))
+    results.extend(sorted_population[:elite_count])
+    
     return results
 
 def ga():

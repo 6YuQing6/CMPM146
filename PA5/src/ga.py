@@ -84,9 +84,23 @@ class Individual_Grid(object):
         right = width - 1
         for y in range(height):
             for x in range(left, right):
+                if random.random() > 0.5:
+                    new_genome[y][x] = self.genome[y][x]
+                else:
+                    new_genome[y][x] = other.genome[y][x]
                 # STUDENT Which one should you take?  Self, or other?  Why?
                 # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
-                pass
+                
+                # Pipe Constraint (replace all empty space below T or | with | until hit a wall)
+                if new_genome[y][x] in ["T", "|"]:
+                    yi = y + 1
+                    while yi < height:
+                        yi += 1
+                        if new_genome[yi][x] == "X":
+                            break
+                        else:
+                            new_genome[yi][x] = "|"
+        new_genome = self.mutate(new_genome)
         # do mutation; note we're returning a one-element tuple here
         return (Individual_Grid(new_genome),)
 

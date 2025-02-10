@@ -47,14 +47,20 @@ class Individual_Grid(object):
         measurements = metrics.metrics(self.to_level())
         # Print out the possible measurements or look at the implementation of metrics.py for other keys:
         # print(measurements.keys())
+            # dict_keys(['length', 'negativeSpace', 'pathPercentage', 'emptyPercentage', 'decorationPercentage', 'leniency',
+            # 'meaningfulJumps', 'jumps', 'meaningfulJumpVariance', 'jumpVariance', 'linearity', 'solvability'])
         # Default fitness function: Just some arbitrary combination of a few criteria.  Is it good?  Who knows?
         # STUDENT Modify this, and possibly add more metrics.  You can replace this with whatever code you like.
         coefficients = dict(
             meaningfulJumpVariance=0.5,
-            negativeSpace=0.6,
+            negativeSpace=0.3,
             pathPercentage=0.5,
-            emptyPercentage=0.6,
-            linearity=-0.5,
+            emptyPercentage=0.8,
+            decorationPercentage=0.2,
+            linearity=0.7,
+            leniency=0.5,
+            meaningfulJumps=1.5,
+            jumps=0.5,
             solvability=2.0
         )
         self._fitness = sum(map(lambda m: coefficients[m] * measurements[m],
@@ -72,25 +78,34 @@ class Individual_Grid(object):
         # STUDENT implement a mutation operator, also consider not mutating this individual
         # STUDENT also consider weighting the different tile types so it's not uniformly random
         # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
-        mutation_rate = 0.05
+        mutation_rate = 0.01
+        tile_mutation = {
+            "-": 0.5,   # Empty space (more likely)
+            "X": 0.2,   # Solid block
+            "?": 0.1,   # Question block with coin
+            "M": 0.05,  # Question block with mushroom
+            "B": 0.05,  # Breakable block
+            "o": 0.1,   # Floating coin
+            "|": 0.02,  # Pipe segment (rare)
+            "T": 0.02,  # Pipe top (rare)
+            "E": 0.08   # Enemy
+        }
         
         left = 1
         right = width - 1
         for y in range(height):
             for x in range(left, right):
-                
-                pass
-                # Pipe Constraint (replace all empty space below T or | with | until hit a wall)
-                # if genome[y][x] in ["T", "|"]:
-                #     yi = y + 1
-                #     while yi < height:
-                #         yi += 1
-                #         if genome[yi][x] in ["X", "|"]:
-                #             break
-                #         else:
-                #             genome[yi][x] = "|"
-                # Wall Constraint (there must be at least 2 blocks of air for the player to pass through)
-                
+                if random.random() <= mutation_rate:
+                    # Prevent floating pipes
+                    if genome[y][x] in ["T", "|"]:
+                        if y < height - 1 and genome[y + 1][x] not in ["|", "X"]:
+                            continue
+                    # Prevent important block deletion
+                    if genome[y][x] in ["X", "B"]:
+                        if y > 2 and genome[y-1][x] != "-":
+                            continue
+                    new_tile = random.choices(list(tile_mutation.keys()), weights=tile_mutation.values())[0]
+                    genome[y][x] = new_tile
         return genome
 
     # Create zero or more children from self and other
@@ -118,11 +133,11 @@ class Individual_Grid(object):
                         new_genome[y][x] = "-"
                 # Block Constraint (if block is floating by itself, replace with air)
                 if new_genome[y][x] in ["B", "?", "M", "X"]:
-                    if y < height - 1 and new_genome[y + 1][x] == "-":
+                    if y < height - 1 and new_genome[y + 1][x] == "-" and new_genome[y - 1][x] == "-":
                         new_genome[y][x] = "-"
                 # Enemy Constraint (enemy shouldn't be floating in the air)
                 if new_genome[y][x] == "E":
-                    if new_genome[y + 1][x] not in ["X", "B", "?", "M"]:
+                    if y < height - 1 and new_genome[y + 1][x] not in ["X", "B", "?", "M"]:
                         new_genome[y][x] = "-"
                 # Question Mark Constraint (item should be obtainable)
                 if new_genome[y][x] in ["M", "?"]:
@@ -392,11 +407,11 @@ def generate_successors(population):
     # creates children from population
     roulette = roulette_selection(population, len(population))
     results.extend(roulette)
-    print("roulette", roulette)
+    # print("roulette", roulette)
     # chooses top % of indiviudals in current pop to stay
     elite = elitist_selection(population, 0.01)
     results.extend(elite)
-    print("elitist", elite)
+    # print("elitist", elite)
 
     # STUDENT Design and implement this
     # Hint: Call generate_children() on some individuals and fill up results.
@@ -430,7 +445,7 @@ def roulette_selection(population, size: int):
         # gene = random.randint(0, 1)
         # print("PARENTS ", parent1, parent2)
         child = parent1.generate_children(parent2)[0]
-        print("ROULETTE CHILD", child)
+        # print("ROULETTE CHILD", child)
         results.append(child)
 
     return results
@@ -453,8 +468,8 @@ def elitist_selection(population, elite_percent: float):
     # keeps the best fitness individuals
     elite_count = max(1, int(pop_limit * elite_percent))
     results.extend(sorted_population[:elite_count])
-    for e in results:
-        print("ELITE", e)
+    # for e in results:
+    #     print("ELITE", e)
     
     return results
 

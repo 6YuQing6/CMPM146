@@ -72,7 +72,8 @@ class Individual_Grid(object):
         # STUDENT implement a mutation operator, also consider not mutating this individual
         # STUDENT also consider weighting the different tile types so it's not uniformly random
         # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
-
+        mutation_rate = 0.05
+        
         left = 1
         right = width - 1
         for y in range(height):
@@ -88,6 +89,8 @@ class Individual_Grid(object):
                 #             break
                 #         else:
                 #             genome[yi][x] = "|"
+                # Wall Constraint (there must be at least 2 blocks of air for the player to pass through)
+                
         return genome
 
     # Create zero or more children from self and other
@@ -105,6 +108,26 @@ class Individual_Grid(object):
                     new_genome[y][x] = other.genome[y][x]
                 # STUDENT Which one should you take?  Self, or other?  Why?
                 # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
+
+        # check constraints
+        for y in range(height):
+            for x in range(left, right):               
+                # Pipe Constraint (if new pipe is not connected to pipe or block, replace with air)
+                if new_genome[y][x] in ["T", "|"]:
+                    if y == height - 1 or new_genome[y + 1][x] not in ["|", "X"]:
+                        new_genome[y][x] = "-"
+                # Block Constraint (if block is floating by itself, replace with air)
+                if new_genome[y][x] in ["B", "?", "M", "X"]:
+                    if y < height - 1 and new_genome[y + 1][x] == "-":
+                        new_genome[y][x] = "-"
+                # Enemy Constraint (enemy shouldn't be floating in the air)
+                if new_genome[y][x] == "E":
+                    if new_genome[y + 1][x] not in ["X", "B", "?", "M"]:
+                        new_genome[y][x] = "-"
+                # Question Mark Constraint (item should be obtainable)
+                if new_genome[y][x] in ["M", "?"]:
+                    if y > height - 2 or new_genome[y - 1][x] in ["X", "M", "B", "?"]:
+                        new_genome[y][x] = "-"
                 
         new_genome = self.mutate(new_genome)
         # do mutation; note we're returning a one-element tuple here

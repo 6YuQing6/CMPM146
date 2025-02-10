@@ -35,7 +35,12 @@ class Individual_Grid(object):
     def __init__(self, genome):
         self.genome = copy.deepcopy(genome)
         self._fitness = None
+    
+    def __str__(self):
+        return f"Fitness: {self._fitness if self._fitness is not None else 'Not Evaluated'}, Genome: {self.genome[:3]}..."  
 
+    def __repr__(self):
+        return f"Individual_Grid(Fitness={self._fitness if self._fitness is not None else 'Not Evaluated'})"
     # Update this individual's estimate of its fitness.
     # This can be expensive so we do it once and then cache the result.
     def calculate_fitness(self):
@@ -72,15 +77,17 @@ class Individual_Grid(object):
         right = width - 1
         for y in range(height):
             for x in range(left, right):
+                
+                pass
                 # Pipe Constraint (replace all empty space below T or | with | until hit a wall)
-                if genome[y][x] in ["T", "|"]:
-                    yi = y + 1
-                    while yi < height:
-                        yi += 1
-                        if genome[yi][x] in ["X", "|"]:
-                            break
-                        else:
-                            genome[yi][x] = "|"
+                # if genome[y][x] in ["T", "|"]:
+                #     yi = y + 1
+                #     while yi < height:
+                #         yi += 1
+                #         if genome[yi][x] in ["X", "|"]:
+                #             break
+                #         else:
+                #             genome[yi][x] = "|"
         return genome
 
     # Create zero or more children from self and other
@@ -358,11 +365,16 @@ Individual = Individual_Grid
 
 def generate_successors(population):
     results = []
+    # print("POPULATION ", population)
     # creates children from population
-    results.append(roulette_selection(population, len(population)))
-    # chooses top 10% of indiviudals in current pop to stay
-    results.append(elitist_selection(population, 0.1))
-    
+    roulette = roulette_selection(population, len(population))
+    results.extend(roulette)
+    print("roulette", roulette)
+    # chooses top % of indiviudals in current pop to stay
+    elite = elitist_selection(population, 0.01)
+    results.extend(elite)
+    print("elitist", elite)
+
     # STUDENT Design and implement this
     # Hint: Call generate_children() on some individuals and fill up results.
     return results
@@ -371,7 +383,7 @@ def generate_successors(population):
 # Roulette Selection: Chooses based on probabilty of (individual fitness / total population fitness)
 # Reference: https://cratecode.com/info/roulette-wheel-selection
 def roulette_selection(population, size: int):
-    print(population)
+    # print(population)
     results = []
     total_fitness = sum(i.fitness() for i in population)
     
@@ -392,8 +404,10 @@ def roulette_selection(population, size: int):
     for i in range(size):
         parent1 = select_parent()
         parent2 = select_parent()
-        gene = random.randint(0, 1)
-        child = parent1.generate_children(parent2)[gene]
+        # gene = random.randint(0, 1)
+        # print("PARENTS ", parent1, parent2)
+        child = parent1.generate_children(parent2)[0]
+        print("ROULETTE CHILD", child)
         results.append(child)
 
     return results
@@ -416,6 +430,8 @@ def elitist_selection(population, elite_percent: float):
     # keeps the best fitness individuals
     elite_count = max(1, int(pop_limit * elite_percent))
     results.extend(sorted_population[:elite_count])
+    for e in results:
+        print("ELITE", e)
     
     return results
 

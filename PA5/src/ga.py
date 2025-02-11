@@ -88,11 +88,11 @@ class Individual_Grid(object):
         # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
         mutation_rate = 0.02
         tile_mutation = {
-            "-": 0.5,   # Empty space (more likely)
-            "X": 0.2,   # Solid block
-            "?": 0.1,   # Question block with coin
+            "-": 0.3,   # Empty space (more likely)
+            "X": 0.15,   # Solid block
+            "?": 0.15,   # Question block with coin
             "M": 0.05,  # Question block with mushroom
-            "B": 0.05,  # Breakable block
+            "B": 0.25,  # Breakable block
             "o": 0.1,   # Floating coin
             "|": 0.02,  # Pipe segment (rare)
             "T": 0.02,  # Pipe top (rare)
@@ -154,9 +154,11 @@ class Individual_Grid(object):
                     # Enemy shouldn't float in air
                     if y < height - 1 and new_genome[y + 1][x] not in ["X", "B", "?", "M"]:
                         new_genome[y][x] = "-"
-                # Ensure Mario's start position and flag is not obstructed
-                if any(0 <= y + dy < height and 0 <= x + dx < width and new_genome[y + dy][x + dx] in ["m", "v", "f"] for dy, dx in [(1, 0), (0, -1), (1, -1)]):
-                    new_genome[y][x] = "-"
+                # Ensure Mario's start position and flag are not obstructed
+                if any(0 <= y + dy < height and 0 <= x + dx < width and new_genome[y + dy][x + dx] in ["m", "v", "f"]
+                    for dy, dx in [(1, 0), (0, -1), (0, 1), (1, -1), (1, 1)]):
+                    if new_genome[y][x] not in ["m", "v", "f"]:  # Don't overwrite the flag
+                        new_genome[y][x] = "-"
                 # Question Mark Constraint (item should be obtainable)
                 if new_genome[y][x] in ["M", "?"]:
                     if y > height - 2 or new_genome[y - 1][x] in ["X", "M", "B", "?"]:
@@ -525,7 +527,7 @@ def ga():
                     print("Max fitness:", str(best.fitness()))
                     print("Average generation time:", (now - start) / generation)
                     print("Net time:", now - start)
-                    with open("levels/last.txt", 'w+') as f:
+                    with open("levels/last.txt", 'w') as f:
                         for row in best.to_level():
                             f.write("".join(row) + "\n")
                 generation += 1

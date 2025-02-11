@@ -51,16 +51,24 @@ class Individual_Grid(object):
             # 'meaningfulJumps', 'jumps', 'meaningfulJumpVariance', 'jumpVariance', 'linearity', 'solvability'])
         # Default fitness function: Just some arbitrary combination of a few criteria.  Is it good?  Who knows?
         # STUDENT Modify this, and possibly add more metrics.  You can replace this with whatever code you like.
+        # coefficients = dict(
+        #     meaningfulJumpVariance=0.5,
+        #     negativeSpace=0.3,
+        #     pathPercentage=0.5,
+        #     emptyPercentage=0.8,
+        #     decorationPercentage=0.2,
+        #     linearity=0.7,
+        #     leniency=0.5,
+        #     meaningfulJumps=1.5,
+        #     jumps=0.5,
+        #     solvability=2.0
+        # )
         coefficients = dict(
             meaningfulJumpVariance=0.5,
-            negativeSpace=0.3,
+            negativeSpace=0.6,
             pathPercentage=0.5,
-            emptyPercentage=0.8,
-            decorationPercentage=0.2,
-            linearity=0.7,
-            leniency=0.5,
-            meaningfulJumps=1.5,
-            jumps=0.5,
+            emptyPercentage=0.6,
+            linearity=-0.5,
             solvability=2.0
         )
         self._fitness = sum(map(lambda m: coefficients[m] * measurements[m],
@@ -78,7 +86,7 @@ class Individual_Grid(object):
         # STUDENT implement a mutation operator, also consider not mutating this individual
         # STUDENT also consider weighting the different tile types so it's not uniformly random
         # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
-        mutation_rate = 0.01
+        mutation_rate = 0.02
         tile_mutation = {
             "-": 0.5,   # Empty space (more likely)
             "X": 0.2,   # Solid block
@@ -104,6 +112,9 @@ class Individual_Grid(object):
                     if genome[y][x] in ["X", "B"]:
                         if y > 2 and genome[y-1][x] != "-":
                             continue
+                    # Prevent flag and mario deletion
+                    if genome[y][x] in ["f", "v", "m"]:
+                        continue
                     new_tile = random.choices(list(tile_mutation.keys()), weights=tile_mutation.values())[0]
                     genome[y][x] = new_tile
         return genome
@@ -117,6 +128,9 @@ class Individual_Grid(object):
         right = width - 1
         for y in range(height):
             for x in range(left, right):
+                # Prevent flag and mario deletion
+                if new_genome[y][x] in ["f", "v", "m"]:
+                    continue
                 if random.random() > 0.5:
                     new_genome[y][x] = self.genome[y][x]
                 else:
@@ -135,10 +149,14 @@ class Individual_Grid(object):
                 if new_genome[y][x] in ["B", "?", "M", "X"]:
                     if y < height - 1 and new_genome[y + 1][x] == "-" and new_genome[y - 1][x] == "-":
                         new_genome[y][x] = "-"
-                # Enemy Constraint (enemy shouldn't be floating in the air)
+                # Enemy Constraint
                 if new_genome[y][x] == "E":
+                    # Enemy shouldn't float in air
                     if y < height - 1 and new_genome[y + 1][x] not in ["X", "B", "?", "M"]:
                         new_genome[y][x] = "-"
+                # Ensure Mario's start position and flag is not obstructed
+                if any(0 <= y + dy < height and 0 <= x + dx < width and new_genome[y + dy][x + dx] in ["m", "v", "f"] for dy, dx in [(1, 0), (0, -1), (1, -1)]):
+                    new_genome[y][x] = "-"
                 # Question Mark Constraint (item should be obtainable)
                 if new_genome[y][x] in ["M", "?"]:
                     if y > height - 2 or new_genome[y - 1][x] in ["X", "M", "B", "?"]:
@@ -405,7 +423,7 @@ def generate_successors(population):
     results = []
     # print("POPULATION ", population)
     # creates children from population
-    roulette = roulette_selection(population, len(population))
+    roulette = roulette_selection(population, int(len(population) * 0.99))
     results.extend(roulette)
     # print("roulette", roulette)
     # chooses top % of indiviudals in current pop to stay

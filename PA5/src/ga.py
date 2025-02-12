@@ -37,7 +37,7 @@ class Individual_Grid(object):
         self._fitness = None
     
     def __str__(self):
-        return f"Fitness: {self._fitness if self._fitness is not None else 'Not Evaluated'}, Genome: {self.genome[:3]}..."  
+        return f"Fitness: {self._fitness if self._fitness is not None else 'Not Evaluated'}, Genome: {self.genome}..."  
 
     def __repr__(self):
         return f"Individual_Grid(Fitness={self._fitness if self._fitness is not None else 'Not Evaluated'})"
@@ -63,14 +63,26 @@ class Individual_Grid(object):
         #     jumps=0.5,
         #     solvability=2.0
         # )
+        # coefficients = dict(
+        #     meaningfulJumpVariance=0.5,
+        #     negativeSpace=-0.5,
+        #     pathPercentage=2.0,
+        #     emptyPercentage=0.8,
+        #     decorationPercentage=0.3,
+        #     linearity=-0.5,
+        #     solvability=2.0
+        # )
+    
         coefficients = dict(
-            meaningfulJumpVariance=0.5,
-            negativeSpace=0.6,
-            pathPercentage=0.5,
-            emptyPercentage=0.6,
-            linearity=-0.5,
-            solvability=2.0
+            negativeSpace=2.0,  # Stronger priority for open space
+            pathPercentage=4.0,  # Even more emphasis on paths
+            emptyPercentage=1.5,  # Encourages open layouts
+            decorationPercentage=0.1,  # Less focus on decorations
+            linearity=-0.3,  # Small penalty for overly linear layouts
+            meaningfulJumps=1.5,  # Moderate importance for jumps
+            solvability=4.0  # Ensure the level is playable
         )
+
         self._fitness = sum(map(lambda m: coefficients[m] * measurements[m],
                                 coefficients))
         return self
@@ -87,16 +99,16 @@ class Individual_Grid(object):
         # STUDENT also consider weighting the different tile types so it's not uniformly random
         # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
         mutation_rate = 0.02
-        tile_mutation = {
-            "-": 0.3,   # Empty space (more likely)
-            "X": 0.15,   # Solid block
-            "?": 0.15,   # Question block with coin
-            "M": 0.05,  # Question block with mushroom
-            "B": 0.25,  # Breakable block
-            "o": 0.1,   # Floating coin
-            "|": 0.02,  # Pipe segment (rare)
-            "T": 0.02,  # Pipe top (rare)
-            "E": 0.08   # Enemy
+        mutation_weight = {
+            "-": 0.5,   # Empty space (more likely)
+            "X": 0.1,   # Solid block
+            "?": 0.05,   # Question block with coin
+            "M": 0.02,  # Question block with mushroom
+            "B": 0.1,  # Breakable block
+            "o": 0.25,   # Floating coin
+            "|": 0.04,  # Pipe segment (rare)
+            "T": 0.04,  # Pipe top (rare)
+            "E": 0.02   # Enemy
         }
         
         left = 1
@@ -115,45 +127,63 @@ class Individual_Grid(object):
                     # Prevent flag and mario deletion
                     if genome[y][x] in ["f", "v", "m"]:
                         continue
-                    new_tile = random.choices(list(tile_mutation.keys()), weights=tile_mutation.values())[0]
-                    genome[y][x] = new_tile
+                    genome[y][x] = random.choices(list(mutation_weight.keys()), weights=mutation_weight.values())[0]
+        
+        # fixes flag and mario position ... bc for some reason it replaces them 
+        genome[14][0] = "m"
+        genome[7][-1] = "v"
+        for col in range(8, 14):
+            # print("FLAGPOLE: ", genome[col][-1])
+            genome[col][-1] = "f"
+        for col in range(14, 16):
+            # print("FLAG BOTTOM: ", genome[col][-1])
+            genome[col][-1] = "X"
         return genome
 
     # Create zero or more children from self and other
     def generate_children(self, other):
         new_genome = copy.deepcopy(self.genome)
+            
         # Leaving first and last columns alone...
-        # do crossover with other
+        # Uniform crossover
         left = 1
         right = width - 1
         for y in range(height):
             for x in range(left, right):
-                # Prevent flag and mario deletion
-                if new_genome[y][x] in ["f", "v", "m"]:
-                    continue
-                if random.random() > 0.5:
-                    new_genome[y][x] = self.genome[y][x]
-                else:
+                if random.random() < 0.5:
                     new_genome[y][x] = other.genome[y][x]
                 # STUDENT Which one should you take?  Self, or other?  Why?
                 # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
-
+        
+        # checks
+        # new_genome[14][0] = "m"
+        # new_genome[7][-1] = "v"
+        # for col in range(8, 14):
+        #     print("FLAGPOLE: ", new_genome[col][-1])
+        #     new_genome[col][-1] = "f"
+        # for col in range(14, 16):
+        #     print("FLAG BOTTOM: ", new_genome[col][-1])
+        #     new_genome[col][-1] = "X"
+            
         # check constraints
         for y in range(height):
             for x in range(left, right):               
-                # Pipe Constraint (if new pipe is not connected to pipe or block, replace with air)
+                # Pipe Constraint (if new pipe is not connected to pipe or block, connect with pipe)
                 if new_genome[y][x] in ["T", "|"]:
-                    if y == height - 1 or new_genome[y + 1][x] not in ["|", "X"]:
+                    if y < height - 1 and new_genome[y + 1][x] not in ["|", "X"]:
                         new_genome[y][x] = "-"
                 # Block Constraint (if block is floating by itself, replace with air)
-                if new_genome[y][x] in ["B", "?", "M", "X"]:
-                    if y < height - 1 and new_genome[y + 1][x] == "-" and new_genome[y - 1][x] == "-":
+                if new_genome[y][x] in ["X", "B"]:
+                    if y < height - 1 and new_genome[y + 1][x] == "-" and new_genome[y - 1][x] == "-" and new_genome[y][x - 1] == "-" and new_genome[y][x+1] == "-":
                         new_genome[y][x] = "-"
                 # Enemy Constraint
                 if new_genome[y][x] == "E":
                     # Enemy shouldn't float in air
                     if y < height - 1 and new_genome[y + 1][x] not in ["X", "B", "?", "M"]:
-                        new_genome[y][x] = "-"
+                        if (y < height - 1) and new_genome[y-1][x] not in ["m", "v", "f"]:
+                            new_genome[y+1][x] = "B"
+                        else:
+                            new_genome[y][x] = "-"
                 # Ensure Mario's start position and flag are not obstructed
                 if any(0 <= y + dy < height and 0 <= x + dx < width and new_genome[y + dy][x + dx] in ["m", "v", "f"]
                     for dy, dx in [(1, 0), (0, -1), (0, 1), (1, -1), (1, 1)]):
@@ -161,12 +191,15 @@ class Individual_Grid(object):
                         new_genome[y][x] = "-"
                 # Question Mark Constraint (item should be obtainable)
                 if new_genome[y][x] in ["M", "?"]:
-                    if y > height - 2 or new_genome[y - 1][x] in ["X", "M", "B", "?"]:
-                        new_genome[y][x] = "-"
-                
-        new_genome = self.mutate(new_genome)
+                    if  y > height - 2 or new_genome[y - 1][x] in ["X", "M", "B", "?"]:
+                        if (y > 0) and new_genome[y-1][x] not in ["m", "v", "f"]:
+                            new_genome[y - 1][x] = "-"
+                        else:
+                            new_genome[y][x] = "-"
+        child = Individual_Grid(new_genome)
+        child.genome = child.mutate(child.genome)
         # do mutation; note we're returning a one-element tuple here
-        return (Individual_Grid(new_genome),)
+        return (child,)
 
     # Turn the genome into a level string (easy for this genome)
     def to_level(self):
@@ -423,14 +456,26 @@ Individual = Individual_Grid
 
 def generate_successors(population):
     results = []
+    pop_size = len(population)
+    roulette_perecentage = 0.98
+    roulette_size = int(pop_size * roulette_perecentage)
+    elite_percentage = 1 - roulette_perecentage
+    
+    roulette = roulette_selection(population, roulette_size)
+    results.extend(roulette)
+    elite = elitist_selection(population, elite_percentage)
+    results.extend(elite)
+    
+    while (len(results) < pop_size):
+        # print("ADJUSTING POP SIZE")
+        results.extend(roulette_selection(population, 1))
+        
     # print("POPULATION ", population)
     # creates children from population
-    roulette = roulette_selection(population, int(len(population) * 0.99))
-    results.extend(roulette)
+
     # print("roulette", roulette)
     # chooses top % of indiviudals in current pop to stay
-    elite = elitist_selection(population, 0.01)
-    results.extend(elite)
+
     # print("elitist", elite)
 
     # STUDENT Design and implement this

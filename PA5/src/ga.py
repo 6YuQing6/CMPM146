@@ -8,8 +8,8 @@ import shutil
 import time
 import math
 
-width = 200
-height = 16
+width = 200   # Standard Mario level width
+height = 16   # Standard Mario level height
 
 options = [
     "-",  # an empty space
@@ -64,15 +64,43 @@ class Individual_Grid(object):
         #     solvability=2.0
         # )
         coefficients = dict(
-            meaningfulJumpVariance=0.5,
-            negativeSpace=0.6,
-            pathPercentage=0.5,
-            emptyPercentage=0.6,
-            linearity=-0.5,
-            solvability=2.0
+            meaningfulJumpVariance=0.5,    # Ensure varied but manageable jumps
+            negativeSpace=0.4,             # Reduce to avoid too many gaps
+            pathPercentage=0.8,            # Increase to ensure traversable paths
+            emptyPercentage=0.4,           # Balance between empty space and platforms
+            linearity=-0.3,                # Slight negative to avoid flat levels
+            solvability=3.0,               # Heavily weight solvable levels
+            decorationPercentage=0.2,      # Add some visual interest
+            leniency=0.6                   # Make levels more forgiving
         )
+        penalties = 0
+        
+        # Penalize long gaps
+        max_gap = 0
+        current_gap = 0
+        for x in range(width):
+            if self.genome[height-1][x] == '-':
+                current_gap += 1
+                max_gap = max(max_gap, current_gap)
+            else:
+                current_gap = 0
+        if max_gap > 4:
+            penalties -= (max_gap - 4) * 0.5
+        
+        # Penalize too many enemies
+        enemy_count = sum(row.count('E') for row in self.genome)
+        if enemy_count > width/10:
+            penalties -= (enemy_count - width/10) * 0.3
+        
+        # Penalize floating platforms
+        for y in range(height-2):
+            for x in range(1, width-1):
+                if self.genome[y][x] in ['X', 'B', '?', 'M']:
+                    if self.genome[y+1][x] == '-':
+                        penalties -= 0.2
+        
         self._fitness = sum(map(lambda m: coefficients[m] * measurements[m],
-                                coefficients))
+                                coefficients)) + penalties
         return self
 
     # Return the cached fitness value or calculate it as needed.
@@ -83,89 +111,79 @@ class Individual_Grid(object):
 
     # Mutate a genome into a new genome.  Note that this is a _genome_, not an individual!
     def mutate(self, genome):
-        # STUDENT implement a mutation operator, also consider not mutating this individual
-        # STUDENT also consider weighting the different tile types so it's not uniformly random
-        # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
         mutation_rate = 0.02
-        tile_mutation = {
-            "-": 0.3,   # Empty space (more likely)
-            "X": 0.15,   # Solid block
-            "?": 0.15,   # Question block with coin
-            "M": 0.05,  # Question block with mushroom
-            "B": 0.25,  # Breakable block
-            "o": 0.1,   # Floating coin
-            "|": 0.02,  # Pipe segment (rare)
-            "T": 0.02,  # Pipe top (rare)
-            "E": 0.08   # Enemy
+        tile_weights = {
+            "-": 0.35,   # Empty space (common)
+            "X": 0.15,   # Solid blocks
+            "?": 0.1,    # Question blocks
+            "M": 0.05,   # Mushroom blocks (rare)
+            "B": 0.15,   # Breakable blocks
+            "o": 0.1,    # Coins
+            "|": 0.05,   # Pipe body (rare)
+            "T": 0.03,   # Pipe top (rare)
+            "E": 0.02    # Enemies (very rare)
         }
         
-        left = 1
-        right = width - 1
         for y in range(height):
-            for x in range(left, right):
-                if random.random() <= mutation_rate:
+            for x in range(1, width-1):  # Skip first/last columns
+                if random.random() < mutation_rate:
+                    # Don't modify ground level except for pipes
+                    if y == height-1:
+                        if genome[y][x] not in ['|', 'T']:
+                            continue
+                            
+                    # Ensure platforms are supported
+                    if y < height-1:
+                        if genome[y+1][x] == '-':  # If no support below
+                            valid_tiles = ['-', 'o']  # Only allow air or coins
+                        else:
+                            valid_tiles = list(tile_weights.keys())
+                            
                     # Prevent floating pipes
-                    if genome[y][x] in ["T", "|"]:
-                        if y < height - 1 and genome[y + 1][x] not in ["|", "X"]:
+                    if genome[y][x] in ['|', 'T']:
+                        if y < height-1 and genome[y+1][x] not in ['|', 'X']:
+                            valid_tiles.remove('|')
+                            valid_tiles.remove('T')
+                            
+                    # Ensure enemies have ground
+                    if genome[y][x] == 'E':
+                        if y < height-1 and genome[y+1][x] == '-':
                             continue
-                    # Prevent important block deletion
-                    if genome[y][x] in ["X", "B"]:
-                        if y > 2 and genome[y-1][x] != "-":
-                            continue
-                    # Prevent flag and mario deletion
-                    if genome[y][x] in ["f", "v", "m"]:
-                        continue
-                    new_tile = random.choices(list(tile_mutation.keys()), weights=tile_mutation.values())[0]
-                    genome[y][x] = new_tile
+                            
+                    weights = [tile_weights[t] for t in valid_tiles]
+                    genome[y][x] = random.choices(valid_tiles, weights=weights)[0]
+        
         return genome
 
     # Create zero or more children from self and other
     def generate_children(self, other):
         new_genome = copy.deepcopy(self.genome)
-        # Leaving first and last columns alone...
-        # do crossover with other
+        
+        # Do crossover with constraints
         left = 1
         right = width - 1
         for y in range(height):
-            for x in range(left, right):
-                # Prevent flag and mario deletion
-                if new_genome[y][x] in ["f", "v", "m"]:
-                    continue
+            # Keep ground level mostly intact
+            if y == height-1:
+                continue
+            
+            # Crossover in chunks to maintain coherent structures
+            chunk_size = random.randint(3, 8)
+            for x in range(left, right, chunk_size):
                 if random.random() > 0.5:
-                    new_genome[y][x] = self.genome[y][x]
-                else:
-                    new_genome[y][x] = other.genome[y][x]
-                # STUDENT Which one should you take?  Self, or other?  Why?
-                # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
-
-        # check constraints
-        for y in range(height):
-            for x in range(left, right):               
-                # Pipe Constraint (if new pipe is not connected to pipe or block, replace with air)
-                if new_genome[y][x] in ["T", "|"]:
-                    if y == height - 1 or new_genome[y + 1][x] not in ["|", "X"]:
-                        new_genome[y][x] = "-"
-                # Block Constraint (if block is floating by itself, replace with air)
-                if new_genome[y][x] in ["B", "?", "M", "X"]:
-                    if y < height - 1 and new_genome[y + 1][x] == "-" and new_genome[y - 1][x] == "-":
-                        new_genome[y][x] = "-"
-                # Enemy Constraint
-                if new_genome[y][x] == "E":
-                    # Enemy shouldn't float in air
-                    if y < height - 1 and new_genome[y + 1][x] not in ["X", "B", "?", "M"]:
-                        new_genome[y][x] = "-"
-                # Ensure Mario's start position and flag are not obstructed
-                if any(0 <= y + dy < height and 0 <= x + dx < width and new_genome[y + dy][x + dx] in ["m", "v", "f"]
-                    for dy, dx in [(1, 0), (0, -1), (0, 1), (1, -1), (1, 1)]):
-                    if new_genome[y][x] not in ["m", "v", "f"]:  # Don't overwrite the flag
-                        new_genome[y][x] = "-"
-                # Question Mark Constraint (item should be obtainable)
-                if new_genome[y][x] in ["M", "?"]:
-                    if y > height - 2 or new_genome[y - 1][x] in ["X", "M", "B", "?"]:
-                        new_genome[y][x] = "-"
-                
-        new_genome = self.mutate(new_genome)
-        # do mutation; note we're returning a one-element tuple here
+                    end_x = min(x + chunk_size, right)
+                    # Copy chunk while maintaining structural integrity
+                    for cx in range(x, end_x):
+                        for cy in range(y, min(y+3, height)):
+                            new_genome[cy][cx] = other.genome[cy][cx]
+                            
+                    # Ensure platform connectivity
+                    if y < height-1:
+                        for cx in range(x, end_x):
+                            if new_genome[y][cx] in ['X', 'B', '?', 'M']:
+                                if new_genome[y+1][cx] == '-':
+                                    new_genome[y][cx] = '-'
+        
         return (Individual_Grid(new_genome),)
 
     # Turn the genome into a level string (easy for this genome)
@@ -188,14 +206,131 @@ class Individual_Grid(object):
 
     @classmethod
     def random_individual(cls):
-        # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
-        # STUDENT also consider weighting the different tile types so it's not uniformly random
-        g = [random.choices(options, k=width) for row in range(height)]
-        g[15][:] = ["X"] * width
-        g[14][0] = "m"
-        g[7][-1] = "v"
-        g[8:14][-1] = ["f"] * 6
-        g[14:16][-1] = ["X", "X"]
+        # Initialize with ground and empty space
+        g = [["-" for col in range(width)] for row in range(height)]
+        
+        # Create solid ground at bottom
+        for x in range(width):
+            g[height-1][x] = "X"
+        
+        # Add required elements
+        g[height-2][0] = "m"  # Mario start
+        g[7][width-1] = "v"  # Flag pole
+        for y in range(8, 14):
+            g[y][width-1] = "f"  # Flag
+        g[height-2][width-1] = "X"  # Flag base
+        g[height-1][width-1] = "X"  # Flag base
+        
+        # Add platforms and challenges
+        last_platform_y = height - 3  # Track last platform height
+        
+        for x in range(5, width-10, random.randint(4, 8)):
+            if random.random() < 0.75:  # 75% chance of platform
+                # Vary platform height based on last platform
+                max_height_diff = 3  # Maximum height difference between platforms
+                min_y = max(height-7, last_platform_y - max_height_diff)
+                max_y = min(height-3, last_platform_y + max_height_diff)
+                platform_y = random.randint(min_y, max_y)
+                
+                # Ensure accessibility with stepping stones if platform is higher
+                if platform_y < last_platform_y - 2:
+                    # Create stepping stones
+                    step_x = x - 3
+                    step_y = last_platform_y - 1
+                    while step_y > platform_y + 1 and step_x < x:
+                        g[step_y][step_x] = "X"
+                        step_x += 1
+                        step_y -= 1
+                
+                last_platform_y = platform_y
+                platform_length = random.randint(4, 8)
+                
+                # Create main platform
+                for px in range(x, min(x + platform_length, width-2)):
+                    g[platform_y][px] = "X"
+                    
+                    # Add accessible decorations above platform
+                    if random.random() < 0.6:
+                        if random.random() < 0.4:
+                            g[platform_y-1][px] = "?"
+                        else:
+                            g[platform_y-1][px] = "B"
+                    
+                    # Add second layer that's reachable
+                    if random.random() < 0.3 and platform_y > height-6:
+                        if g[platform_y-1][px] in ["?", "B"]:
+                            # Ensure there's a way to reach higher blocks
+                            if px > x and g[platform_y-1][px-1] == "-":
+                                g[platform_y-1][px-1] = "X"  # Add stepping block
+                            if random.random() < 0.5:
+                                g[platform_y-2][px] = "B"
+                            else:
+                                g[platform_y-2][px] = "o"
+                
+                # Add enemies on platforms
+                if platform_length > 4 and random.random() < 0.5:
+                    enemy_x = x + random.randint(1, platform_length-2)
+                    if g[platform_y-1][enemy_x] == "-":
+                        g[platform_y-1][enemy_x] = "E"
+        
+        # Add ground variation and pipes
+        for x in range(1, width-2, random.randint(10, 15)):
+            if random.random() < 0.5:
+                pipe_height = random.randint(2, 4)
+                if x < width-4:
+                    # Add stepping blocks near tall pipes
+                    if pipe_height > 2:
+                        g[height-2][x-1] = "X"  # Stepping block
+                    
+                    for y in range(height-pipe_height-1, height-1):
+                        g[y][x] = "|"
+                        g[y][x+1] = "|"
+                    g[height-pipe_height-1][x] = "T"
+                    g[height-pipe_height-1][x+1] = "T"
+                    
+                    if random.random() < 0.4:
+                        if x > 2 and g[height-2][x-2] == "-":
+                            g[height-2][x-2] = "E"
+                    x += 1
+        
+        # Add floating blocks with access paths
+        for x in range(5, width-5, random.randint(4, 7)):
+            for y in range(height-6, height-2):
+                if g[y][x] == "-" and g[y+1][x] == "-":
+                    if random.random() < 0.4:
+                        # Create access path
+                        if y < height-3:  # If block is high up
+                            # Add stepping stone below
+                            g[y+1][x-1] = "X"
+                        
+                        if random.random() < 0.6:
+                            g[y][x] = "?"
+                        elif random.random() < 0.7:
+                            g[y][x] = "B"
+                        else:
+                            g[y][x] = "o"
+        
+        # Add ground decorations and enemies
+        for x in range(1, width-2):
+            if g[height-2][x] == "-":
+                if random.random() < 0.15:
+                    if random.random() < 0.6:
+                        g[height-2][x] = "B"
+                    else:
+                        g[height-2][x] = "?"
+                elif random.random() < 0.1:
+                    g[height-2][x] = "E"
+        
+        # Add mushroom power-ups with access
+        for x in range(5, width-5, random.randint(20, 30)):
+            if random.random() < 0.3:
+                y = random.randint(height-5, height-3)
+                if g[y][x] == "?":
+                    g[y][x] = "M"
+                    # Ensure mushroom is accessible
+                    if y < height-3 and g[y+1][x] == "-":
+                        g[y+1][x-1] = "X"  # Add stepping block
+        
         return cls(g)
 
 
@@ -237,11 +372,13 @@ class Individual_DE(object):
         # STUDENT Improve this with any code you like
         coefficients = dict(
             meaningfulJumpVariance=0.5,
-            negativeSpace=0.6,
-            pathPercentage=0.5,
-            emptyPercentage=0.6,
-            linearity=-0.5,
-            solvability=2.0
+            negativeSpace=0.4,
+            pathPercentage=0.8,
+            emptyPercentage=0.4,
+            linearity=-0.3,
+            solvability=3.0,
+            decorationPercentage=0.2,
+            leniency=0.6
         )
         penalties = 0
         # STUDENT For example, too many stairs are unaesthetic.  Let's penalize that
@@ -494,6 +631,13 @@ def elitist_selection(population, elite_percent: float):
     return results
 
 def ga():
+    # Full path to Unity project's level file
+    level_path = "levels/last.txt"
+    
+    # Create levels directory if it doesn't exist
+    if not os.path.exists("levels"):
+        os.makedirs("levels")
+        
     # STUDENT Feel free to play with this parameter
     pop_limit = 480
     # Code to parallelize some computations
@@ -521,25 +665,39 @@ def ga():
             while True:
                 now = time.time()
                 # Print out statistics
-                if generation > 0:
-                    best = max(population, key=Individual.fitness)
-                    print("Generation:", str(generation))
-                    print("Max fitness:", str(best.fitness()))
-                    print("Average generation time:", (now - start) / generation)
-                    print("Net time:", now - start)
-                    with open("levels/last.txt", 'w') as f:
-                        for row in best.to_level():
+                best = max(population, key=Individual.fitness)
+                print("Generation:", str(generation))
+                print("Max fitness:", str(best.fitness()))
+                print("Average generation time:", (now - start) / generation if generation > 0 else 0)
+                print("Net time:", now - start)
+                
+                # Randomly select a level from top 25% of population
+                sorted_population = sorted(population, key=Individual.fitness, reverse=True)
+                top_quarter = sorted_population[:len(sorted_population)//4]
+                selected_level = random.choice(top_quarter)
+                
+                # Write directly to Unity project path
+                try:
+                    with open(level_path, 'w') as f:
+                        level_data = selected_level.to_level()
+                        for row in level_data:
                             f.write("".join(row) + "\n")
+                    print(f"Wrote level to {level_path}")
+                except Exception as e:
+                    print(f"Error writing to {level_path}: {e}")
+                
                 generation += 1
                 # STUDENT Determine stopping condition
                 stop_condition = False
                 if stop_condition:
                     break
+                
                 # STUDENT Also consider using FI-2POP as in the Sorenson & Pasquier paper
                 gentime = time.time()
                 next_population = generate_successors(population)
                 gendone = time.time()
                 print("Generated successors in:", gendone - gentime, "seconds")
+                
                 # Calculate fitness in batches in parallel
                 next_population = pool.map(Individual.calculate_fitness,
                                            next_population,
@@ -547,6 +705,7 @@ def ga():
                 popdone = time.time()
                 print("Calculated fitnesses in:", popdone - gendone, "seconds")
                 population = next_population
+                
         except KeyboardInterrupt:
             pass
     return population

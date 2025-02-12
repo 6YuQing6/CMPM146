@@ -256,6 +256,14 @@ public class SMBPlayer : SMBCharacter {
 			_audio.PlayOneShot (soundEffects[(int)SoundEffects.Jump]);
 		}
 
+		if (_isOnGround && Input.GetKeyDown(KeyCode.UpArrow)){
+
+			_jumpTimer = longJumpTime;
+			_body.velocity.y = ySpeed * Time.fixedDeltaTime;
+
+			_audio.PlayOneShot (soundEffects[(int)SoundEffects.Jump]);
+		}
+
 		if (_jumpTimer > 0f) {
 
 			if (Input.GetKeyUp(KeyCode.X)) {
